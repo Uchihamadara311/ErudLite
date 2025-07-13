@@ -1,0 +1,83 @@
+main {
+    height: 100%;
+}
+
+.placeholder {
+    display: flex;
+    text-align: center;
+    justify-content: space-around;
+    padding: 70px;
+    background-image: url('../assets/ss3.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    /* Feather effect on the entire section */
+    box-shadow: inset 0 0 50px rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    position: relative;
+}
+
+/* Feather overlay effect */
+.placeholder::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.05) 50%,
+        rgba(255, 255, 255, 0.1) 100%
+    );
+    border-radius: 20px;
+    pointer-events: none;
+}
+
+.placeholder div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 200px;
+    margin: 0 20px;
+    /* Feather effect on profile cards */
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.placeholder div:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.placeholder div p {
+    word-wrap: break-word;
+    hyphens: auto;
+    text-align: center;
+    line-height: 1.5;
+    margin-top: 15px;
+}
+
+.profilePicture {
+    padding: 25px;
+    border-radius: 100%;
+    width: 250px;
+    height: 250px;
+    object-fit: cover;
+    /* Feather effect on profile images */
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    transition: all 0.3s ease;
+}
+
+.profilePicture:hover {
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.8);
+    transform: scale(1.05);
+}

@@ -1,0 +1,102 @@
+:root {
+  /* Primary Colors (Warm Browns/Taupes) */
+  --primary-color: #8b7355;        /* Warm Brown */
+  --primary-light: #a68b5b;        /* Light Brown */
+  --primary-dark: #6d5d4f;         /* Dark Brown */
+  --primary-pale: #f5f0e8;         /* Very Light Cream */
+  
+  /* Secondary Colors (Golds/Ambers) */
+  --secondary-color: #d4af37;      /* Rich Gold */
+  --secondary-light: #f4d03f;      /* Light Gold */
+  --secondary-dark: #b7950b;       /* Dark Gold */
+  --secondary-pale: #fef9e7;       /* Very Light Gold */
+  
+  /* Background Colors (Creams/Beiges) */
+  --background-color: #f8f5f0;     /* Light Cream */
+  --background-white: #ffffff;     /* Pure White */
+  --background-dark: #4a403a;      /* Dark Brown */
+  --background-cream: #faf7f2;     /* Warm Cream */
+  --background-blue: #f0ede8;      /* Light Beige */
+  
+  /* Accent & Other Colors */
+  --accent-color: #a68b5b;         /* Warm Accent */
+  --text-color: #3d3428;           /* Dark Brown Text */
+  --success-color: #27ae60;        /* Green */
+  --warning-color: #e67e22;        /* Warm Orange */
+  --error-color: #c0392b;          /* Warm Red */
+}
+
+* { 
+  margin: 0px; 
+  padding: 0px; 
+  box-sizing: border-box; 
+  font-family: 'Montserrat', sans-serif;
+} 
+
+.logo {
+  border-radius: 100%;
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+}
+
+.title {
+  font-size: 2em;
+  font-weight: bold;
+  color: var(--text-color);
+}
+
+body {
+  color: rgb(0, 0, 0);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.topBar {
+  top: 0;
+  display: flex;
+  width: 100vw;
+  height: 70px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  background-color: var(--background-color);
+}
+
+.topBar a:hover {
+  opacity: 0.7;
+}
+
+.navBar {
+  display: flex;
+  flex-direction: row;
+  justify-content: end;
+  align-items: center;
+}
+
+.navBar a {
+  padding: 0px 10px;
+  color: black;
+  text-decoration: none;
+}
+
+footer {
+  bottom: 0;
+  position: fixed;
+  color: var(--text-color);
+  background-color: var(--secondary-color);
+  height: 5vh;
+  width: 100vw;
+  padding: 10px;
+}
+
+footer a {
+  text-decoration: none;
+  color: white;
+}
+
+footer a:hover {
+  opacity: 0.7;
+}
+
