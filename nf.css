@@ -1,0 +1,148 @@
+/* Add to your existing CSS files */
+
+/* Student Dashboard enhancements */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    color: var(--background-white);
+    padding: 25px;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card i {
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.stat-number {
+    font-size: 2.5em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+/* Recent grades */
+.recent-grades {
+    background-color: var(--background-white);
+    border-radius: 15px;
+    padding: 25px;
+    margin-top: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.grades-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.grade-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: var(--background-color);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.grade-item:hover {
+    background-color: var(--primary-pale);
+    transform: translateX(5px);
+}
+
+.grade-remarks.promoted {
+    background-color: var(--success-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+.grade-remarks.needs-improvement {
+    background-color: var(--warning-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+/* Schedule page */
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.day-schedule {
+    background-color: var(--background-white);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.day-schedule h2 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 1.5em;
+}
+
+.class-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: var(--background-color);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.class-item:hover {
+    background-color: var(--primary-pale);
+    transform: translateX(5px);
+}
+
+.class-time {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+    min-width: 80px;
+    margin-right: 15px;
+}
+
+.class-details h3 {
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+.class-details p {
+    margin: 2px 0;
+    color: var(--text-color);
+    font-size: 0.9em;
+}
+
+.class-details i {
+    margin-right: 5px;
+    color: var(--primary-color);
+}
