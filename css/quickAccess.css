@@ -40,21 +40,21 @@ main div a:nth-child(1) {
     border-top-left-radius: 100%;
     justify-content: flex-end;
     align-items: flex-end;
-    background-color: #A9AAAB;
+    background-color: var(--primary-light);
 }
 
 main div a:nth-child(2) {
     border-top-right-radius: 100%;
     justify-content: flex-start;
     align-items: flex-end;
-    background-color: #EBDCDC;
+    background-color: var(--secondary-light);
 }
 
 main div a:nth-child(3) {
     border-bottom-left-radius: 100%;
     align-items: flex-start;
     padding-left: 18%;
-    background-color: #D9D9D9;
+    background-color: var(--accent-color);
 }
 
 main div a:nth-child(4) {
@@ -62,7 +62,7 @@ main div a:nth-child(4) {
     justify-content: flex-start;
     align-items: flex-start;
     padding-left: 11%;
-    background-color: #DAF2ED;
+    background-color: var(--success-color);
 }
 
 main div a:hover {

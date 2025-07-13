@@ -46,6 +46,7 @@ main {
 .rightContainer {
     width: 80%;
     height: 100%;
+    background-color: var(--primary-pale);
 }
 
 .basicInfo {
@@ -54,12 +55,12 @@ main {
     width: 100%;
     padding: 20px 20px 20px 20px;
     border-radius: 0px 0px 20px 20px;
-    background-color: var(--primary-light);
+    background-color: var(--background-white);
 }
 
 .basicInfo:hover{
-    background-color: #b2070750;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    background-color: var(--background-cream);
+    transition: all 0.3s ease, color 0.3s ease;
 }
 
 .basicInfo p {
@@ -69,8 +70,8 @@ main {
 }
 
 .basicInfo section {
-    background-color: rgb(255, 255, 255);
-    border: 3px solid var(--secondary-color);
+    background-color: var(--background-white);
+    border: 3px solid var(--secondary-light);
     border-radius: 10px;
     padding: 25px;
     margin: 10px;
@@ -86,19 +87,19 @@ main {
 
 .quickLinks a {
     text-decoration: none;
-    color: black;
+    color: var(--text-color);
     width: 100%;
     height: 100%;
     padding: 10px;
     margin: 5px;
     border-radius: 25px;
-    background-color: var(--primary-pale);
+    background-color: var(--background-white);
 }
 
 .quickLinks a:hover{
-    background-color: var(--primary-dark);
-    color: rgb(255, 255, 255);
-    transition: background-color 0.3s ease,
+    background-color: var(--primary-light);
+    color: var(--background-white);
+    transition: all 0.3s ease,
     color 0.3s ease;
     cursor: pointer;
 }

@@ -13,7 +13,7 @@ main {
     flex-direction: column;
     width: 20%;
     height: 100%;
-    background-color: #c7c7c7;
+    background-color: var(--background-blue);
 }
 
 .leftContainer h1 {
@@ -47,7 +47,7 @@ main {
 .rightContainer {
     display: flex;
     width: 100%;
-    background-color: rgb(220, 220, 220);
+    background-color: var(--primary-pale);
 }
 
 .backButton {
@@ -59,14 +59,13 @@ main {
     border-radius: 10px;
     color: black;
     text-decoration: none;
-    background-color: rgb(244, 244, 244);
+    background-color: var(--background-white);
 }
 
 .backButton:hover {
-    background-color: rgb(244, 244, 244, 0.5);
-    transition: background-color 0.3s ease;
-    color: rgb(0, 0, 0);
+    opacity: 0.5;
     cursor: pointer;
+    transition: all 0.3s ease;
 }
 
 .GPA {
@@ -75,7 +74,7 @@ main {
     margin: 25px 0px 10px 20px;
     border-radius: 10px;
     padding: 25px;
-    background-color: rgb(255, 255, 255);
+    background-color: whitesmoke;
 }
 
 .ATTENDANCE {
@@ -84,7 +83,7 @@ main {
     margin: 10px 0px 10px 20px;
     border-radius: 10px;
     padding: 25px;
-    background-color: rgb(255, 255, 255);
+    background-color: white;
 }
 
 .QUARTER {
@@ -93,7 +92,7 @@ main {
     margin: 10px 0px 10px 20px;
     border-radius: 10px;
     padding: 25px;
-    background-color: rgb(255, 255, 255);
+    background-color: whitesmoke;
 }
 
 .SUBJECT_GRADES {
@@ -101,7 +100,7 @@ main {
     padding: 25;
     margin: 25;
     border-radius: 10px;
-    background-color: rgb(255, 255, 255);
+    background-color: whitesmoke;
 }
 
 .quickLinks {

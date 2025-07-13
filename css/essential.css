@@ -1,29 +1,29 @@
 :root {
-  /* Primary Colors (Warm Browns/Taupes) */
-  --primary-color: #8b7355;        /* Warm Brown */
-  --primary-light: #a68b5b;        /* Light Brown */
-  --primary-dark: #6d5d4f;         /* Dark Brown */
-  --primary-pale: #f5f0e8;         /* Very Light Cream */
+  /* Primary Colors (Academic Navy/Blue) */
+  --primary-color: #1e3a8a;        /* Deep Academic Blue */
+  --primary-light: #3b82f6;        /* Bright Blue */
+  --primary-dark: #1e40af;         /* Dark Navy */
+  --primary-pale: #dbeafe;         /* Very Light Blue */
   
-  /* Secondary Colors (Golds/Ambers) */
-  --secondary-color: #d4af37;      /* Rich Gold */
-  --secondary-light: #f4d03f;      /* Light Gold */
-  --secondary-dark: #b7950b;       /* Dark Gold */
-  --secondary-pale: #fef9e7;       /* Very Light Gold */
+  /* Secondary Colors (Academic Gold/Amber) */
+  --secondary-color: #f59e0b;      /* Academic Gold */
+  --secondary-light: #fbbf24;      /* Light Gold */
+  --secondary-dark: #d97706;       /* Dark Amber */
+  --secondary-pale: #fef3c7;       /* Very Light Gold */
   
-  /* Background Colors (Creams/Beiges) */
-  --background-color: #f8f5f0;     /* Light Cream */
+  /* Background Colors (Clean & Professional) */
+  --background-color: #f8fafc;     /* Light Gray */
   --background-white: #ffffff;     /* Pure White */
-  --background-dark: #4a403a;      /* Dark Brown */
-  --background-cream: #faf7f2;     /* Warm Cream */
-  --background-blue: #f0ede8;      /* Light Beige */
+  --background-dark: #1f2937;      /* Dark Gray */
+  --background-cream: #fefce8;     /* Light Cream */
+  --background-blue: #eff6ff;      /* Light Blue Background */
   
   /* Accent & Other Colors */
-  --accent-color: #a68b5b;         /* Warm Accent */
-  --text-color: #3d3428;           /* Dark Brown Text */
-  --success-color: #27ae60;        /* Green */
-  --warning-color: #e67e22;        /* Warm Orange */
-  --error-color: #c0392b;          /* Warm Red */
+  --accent-color: #6366f1;         /* Academic Purple */
+  --text-color: #1f2937;           /* Dark Gray Text */
+  --success-color: #059669;        /* Academic Green */
+  --warning-color: #dc2626;        /* Academic Red */
+  --error-color: #ef4444;          /* Bright Red */
 }
 
 * { 
