@@ -29,6 +29,7 @@ main div a {
     height: 50%;
     color: rgb(0, 0, 0);
     border: 10px whitesmoke solid;
+    transition: border 0.2s ease-in-out;
 }
 
 .icon {
@@ -66,6 +67,5 @@ main div a:nth-child(4) {
 }
 
 main div a:hover {
-    border: 7px rgb(255, 255, 255) solid;
-    transition: border 0.1s ease-in-out;
+    border: 12px rgb(255, 255, 255) solid;
 }

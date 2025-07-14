@@ -56,11 +56,11 @@ main {
     padding: 20px 20px 20px 20px;
     border-radius: 0px 0px 20px 20px;
     background-color: var(--background-white);
+    transition: all 0.3s ease, color 0.3s ease;
 }
 
 .basicInfo:hover{
     background-color: var(--background-cream);
-    transition: all 0.3s ease, color 0.3s ease;
 }
 
 .basicInfo p {
@@ -94,12 +94,11 @@ main {
     margin: 5px;
     border-radius: 25px;
     background-color: var(--background-white);
+    transition: all 0.3s ease, color 0.3s ease;
 }
 
 .quickLinks a:hover{
     background-color: var(--primary-light);
     color: var(--background-white);
-    transition: all 0.3s ease,
-    color 0.3s ease;
     cursor: pointer;
 }
