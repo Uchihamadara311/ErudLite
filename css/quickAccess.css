@@ -2,22 +2,25 @@ main {
     display: flex;
     justify-content: center;
     padding: 100px;
-    height: 100%
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    transition: 0.3s all ease-in-out;
 }
 
-main div {
+.choice-section {
     display: flex;
     justify-content: center;
     align-items: center;
     flex-wrap: wrap;
     padding: 20px;
-    height: 550px;
-    width: 550px;
+    height: 40rem;
+    width: 40rem;
     border-radius: 100%;
     box-shadow: inset 0px 0px 10px rgba(0, 0, 0, 0.1), 0px 0px 20px rgba(0, 0, 0, 0.1)
 }
 
-main div a {
+.choice-section a {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -29,7 +32,7 @@ main div a {
     height: 50%;
     color: rgb(0, 0, 0);
     border: 10px whitesmoke solid;
-    transition: border 0.2s ease-in-out;
+    transition: all 0.2s ease-in-out;
 }
 
 .icon {
@@ -37,28 +40,28 @@ main div a {
     margin-bottom: 10px;
 }
 
-main div a:nth-child(1) {
+.choice-section a:nth-child(1) {
     border-top-left-radius: 100%;
     justify-content: flex-end;
     align-items: flex-end;
     background-color: var(--primary-light);
 }
 
-main div a:nth-child(2) {
+.choice-section a:nth-child(2) {
     border-top-right-radius: 100%;
     justify-content: flex-start;
     align-items: flex-end;
     background-color: var(--secondary-light);
 }
 
-main div a:nth-child(3) {
+.choice-section a:nth-child(3) {
     border-bottom-left-radius: 100%;
     align-items: flex-start;
     padding-left: 18%;
     background-color: var(--accent-color);
 }
 
-main div a:nth-child(4) {
+.choice-section a:nth-child(4) {
     border-bottom-right-radius: 100%;
     justify-content: flex-start;
     align-items: flex-start;
@@ -67,5 +70,5 @@ main div a:nth-child(4) {
 }
 
 main div a:hover {
-    border: 12px rgb(255, 255, 255) solid;
+    border: 0px whitesmoke solid;
 }
