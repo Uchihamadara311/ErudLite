@@ -17,7 +17,8 @@ main {
     height: 40rem;
     width: 40rem;
     border-radius: 100%;
-    box-shadow: inset 0px 0px 10px rgba(0, 0, 0, 0.1), 0px 0px 20px rgba(0, 0, 0, 0.1)
+    box-shadow: inset 0px 0px 10px rgba(0, 0, 0, 0.1), 0px 0px 20px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease-in-out;
 }
 
 .choice-section a {
@@ -32,12 +33,27 @@ main {
     height: 50%;
     color: rgb(0, 0, 0);
     border: 10px whitesmoke solid;
-    transition: all 0.2s ease-in-out;
+    /* Enhanced transition with smoother easing */
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* Add transform origin for smooth scaling */
+    transform-origin: center;
+    /* Initial state for hover effects */
+    filter: brightness(1);
+    box-shadow: inset 0px 0px 0px rgba(255, 255, 255, 0);
+}
+
+/* Add smooth text transitions */
+.choice-section a span {
+    transition: all 0.3s ease-in-out;
+    font-weight: 500;
+    line-height: 1.3;
 }
 
 .icon {
     font-size: 2em;
     margin-bottom: 10px;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    display: inline-block;
 }
 
 .choice-section a:nth-child(1) {
@@ -69,6 +85,144 @@ main {
     background-color: var(--success-color);
 }
 
+/* Enhanced hover effects */
 main div a:hover {
     border: 0px whitesmoke solid;
+    transform: scale(1.05);
+    filter: brightness(1.1);
+    box-shadow: 
+        inset 0px 0px 30px rgba(255, 255, 255, 0.3),
+        0px 0px 30px rgba(0, 0, 0, 0.2);
+    background-blend-mode: overlay;
+}
+
+/* Icon hover effects */
+main div a:hover .icon {
+    transform: scale(1.2) rotate(5deg);
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+}
+
+/* Text hover effects */
+main div a:hover span {
+    font-weight: 600;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+/* Active state for better interaction feedback */
+main div a:active {
+    transform: scale(0.95);
+    transition: all 0.1s ease;
+}
+
+/* Focus state for accessibility */
+main div a:focus {
+    outline: 3px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 5px;
+    border-radius: inherit;
+}
+
+/* Individual quadrant hover enhancements */
+.choice-section a:nth-child(1):hover {
+    background-color: var(--primary-light);
+    filter: brightness(1.15) saturate(1.1);
+}
+
+.choice-section a:nth-child(2):hover {
+    background-color: var(--secondary-light);
+    filter: brightness(1.15) saturate(1.1);
+}
+
+.choice-section a:nth-child(3):hover {
+    background-color: var(--accent-color);
+    filter: brightness(1.15) saturate(1.1);
+}
+
+.choice-section a:nth-child(4):hover {
+    background-color: var(--success-color);
+    filter: brightness(1.15) saturate(1.1);
+}
+
+/* Enhanced circular container hover effect */
+.choice-section:hover {
+    box-shadow: 
+        inset 0px 0px 15px rgba(0, 0, 0, 0.15), 
+        0px 0px 35px rgba(0, 0, 0, 0.2);
+}
+
+/* Staggered animation on page load */
+.choice-section a {
+    animation: fadeInScale 0.6s ease forwards;
+    transform: scale(0.8);
+}
+
+.choice-section a:nth-child(1) { animation-delay: 0.1s; }
+.choice-section a:nth-child(2) { animation-delay: 0.2s; }
+.choice-section a:nth-child(3) { animation-delay: 0.3s; }
+.choice-section a:nth-child(4) { animation-delay: 0.4s; }
+
+@keyframes fadeInScale {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Subtle pulse animation on hover */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 
+            inset 0px 0px 30px rgba(255, 255, 255, 0.3),
+            0px 0px 30px rgba(0, 0, 0, 0.2);
+    }
+    50% {
+        box-shadow: 
+            inset 0px 0px 40px rgba(255, 255, 255, 0.4),
+            0px 0px 40px rgba(0, 0, 0, 0.3);
+    }
+}
+
+main div a:hover {
+    animation: pulse 2s infinite;
+}
+
+.background-change {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+
+    z-index: -1;
+    pointer-events: none;
+
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    main {
+        padding: 50px 20px;
+    }
+    
+    .choice-section {
+        height: 30rem;
+        width: 30rem;
+    }
+    
+    .choice-section a {
+        padding: 30px;
+    }
+    
+    .icon {
+        font-size: 1.5em;
+    }
+    
+    main div a:hover {
+        transform: scale(1.03);
+    }
 }
