@@ -34,7 +34,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subject Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
-    <link rel="stylesheet" href="css/adminSubjectManagement.css">
+    <link rel="stylesheet" href="css/adminManagement.css">
     <style>.hidden { display:none; }</style>
 </head>
 <body>
@@ -129,20 +129,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchBar = document.getElementById('searchBar');
-        if (searchBar) {
-            searchBar.addEventListener('keyup', function() {
-                let filter = this.value.toLowerCase();
-                let rows = document.querySelectorAll("#subjects-table tbody tr");
-                rows.forEach(function(row) {
-                    let text = row.textContent.toLowerCase();
-                    row.style.display = text.indexOf(filter) > -1 ? "" : "none";
-                });
-            });
-        }
-    });
-</script>
+    <script src="js/search.js" defer></script>
 </body>
 </html>

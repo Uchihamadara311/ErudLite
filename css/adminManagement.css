@@ -1,4 +1,4 @@
-/* Admin Subject Management Styles */
+/* Admin Management Styles (Shared for Users and Subjects) */
 .admin-container {
     max-width: 1200px;
     margin: 0 auto;
@@ -56,12 +56,24 @@
     gap: 10px;
 }
 
+/* Icons for different page types */
 .form-title::before {
-    content: '\f02d';
     font-family: 'Font Awesome 6 Free';
     font-weight: 900;
     font-size: 1.5rem;
     color: #3498db;
+}
+
+/* Subject Management Icon */
+body:has([action*="adminSubjectManagement"]) .form-title::before,
+body:has([id*="subjects-table"]) .form-title::before {
+    content: '\f02d'; /* fa-book */
+}
+
+/* User Management Icon */
+body:has([action*="adminUserManagement"]) .form-title::before,
+body:has([id*="users-table"]) .form-title::before {
+    content: '\f007'; /* fa-user */
 }
 
 .form-grid {
