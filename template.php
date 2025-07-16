@@ -1,3 +1,12 @@
+<?php require 'includes/db.php';
+
+if(!isset($_SESSION['email'])) {
+    header("Location: login.php");
+    exit();
+}
+
+?>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,7 +20,13 @@
         <div class="topBar">
             <a class="logo-text" href="quickAccess.php">
                 <img src="assets/logo.png" alt="PMS Logo" class="logo">
-                <h3>ERUDLITE</h3>
+                <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
+                    <h3>ERUDLITE [ADMIN]</h3>
+                <?php elseif(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Teacher'): ?>
+                    <h3>ERUDLITE [TEACHER]</h3>
+                <?php else: ?>
+                    <h3>ERUDLITE</h3>
+                <?php endif; ?>
             </a>
             <div class="navBar">
                 <a href="quickAccess.php">Home</a>

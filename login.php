@@ -58,7 +58,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <p>Please sign in to your account</p>
             </div>
             
-            <form method="POST" class="login-form">
+            <form method="POST" class="login-form" autocomplete="on">
                 <?php if(!empty($error_message)): ?>
                     <div class="error-message">
                         <i class="fas fa-exclamation-circle"></i>
@@ -68,12 +68,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 <div class="form-group">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" required placeholder="Enter your email">
+                    <input type="email" id="email" name="email" required placeholder="Enter your email" autocomplete="email">
                 </div>
                 
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                    <input type="password" id="password" name="password" required placeholder="Enter your password" autocomplete="current-password">
                 </div>
                 
                 <button type="submit" class="login-btn">
