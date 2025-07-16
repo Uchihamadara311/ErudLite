@@ -23,7 +23,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         if(password_verify($password, $password_hash)) {
             $_SESSION['email'] = $email;
             $_SESSION['permissions'] = $permissions;
-            header("Location: logout_button.php");
+            header("Location: quickAccess.php");
             exit();
         } else {
             $error_message = "Invalid password";
@@ -40,27 +40,48 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PMS</title>
+    <title>Login - ErudLite PMS</title>
     <link rel="stylesheet" href="css/essential.css">
-    <link rel="stylesheet" href="css/quickAccess.css">
+    <link rel="stylesheet" href="css/login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body>
-    <div id="header-placeholder"></div>
-    <div class="background-change">test</div>
     <main>
-        <h1>Login</h1>
-        <form method="POST">
-            <?php if(!empty($error_message)): ?>
-                <div class="error-message"><?php echo htmlspecialchars($error_message)?></div>
-            <?php endif;?>
-            <label>USERNAME:</label>
-            <input type="email" name="email" required>
-            <label>PASSWORD:</label>
-            <input type="password" name="password" required>
-            <button type="submit">Login</button>
-        </form>
+        <div class="login-container">
+            <div class="logo-section">
+                <img src="assets/logo.png" alt="ErudLite Logo">
+                <h2>ERUDLITE</h2>
+            </div>
+            
+            <div class="login-header">
+                <h1>Welcome Back</h1>
+                <p>Please sign in to your account</p>
+            </div>
+            
+            <form method="POST" class="login-form">
+                <?php if(!empty($error_message)): ?>
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <?php echo htmlspecialchars($error_message)?>
+                    </div>
+                <?php endif;?>
+                
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required placeholder="Enter your email">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required placeholder="Enter your password">
+                </div>
+                
+                <button type="submit" class="login-btn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In
+                </button>
+            </form>
+        </div>
     </main>
-    <footer id="footer-placeholder"></footer>
-    <script src="js/layout-loader.js"></script>
 </body>
 </html>

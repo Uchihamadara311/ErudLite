@@ -14,9 +14,19 @@
                 <h3>ERUDLITE</h3>
             </a>
             <div class="navBar">
+                <a href="quickAccess.php">Home</a>
                 <a href="about.php">About</a>
-                <a href="">Settings</a>
-                <a href="studentDashboard.php"><img src="assets/profile.png" alt="Profile"  class="logo"></a>
+                <div class="profile-dropdown">
+                    <a href="#" class="profile-trigger">
+                        <img src="assets/profile.png" alt="Profile" class="logo">
+                        <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <div class="dropdown-content">
+                        <a href="studentDashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                        <a href="#"><i class="fas fa-user-cog"></i> Manage Account</a>
+                        <a href="includes/logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
