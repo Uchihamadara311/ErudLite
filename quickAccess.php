@@ -1,3 +1,12 @@
+<?php require 'includes/db.php';
+
+if(!isset($_SESSION['email'])) {
+    header("Location: login.php");
+    exit();
+}
+
+?>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -5,8 +14,7 @@
     <title>PMS</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/quickAccess.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap">
+   
 </head>
 <body>
     <div id="header-placeholder"></div>

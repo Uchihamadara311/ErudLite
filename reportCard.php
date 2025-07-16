@@ -6,18 +6,9 @@
     <title>Digital Report Card - ERUDLITE</title>
     <link rel="stylesheet" href="css/essential.css">
     <!-- <link rel="stylesheet" href="css/reportCard.css"> -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body>
-    <div class="topBar">
-        <div class="title">ERUDLITE</div>
-        <div class="navBar">
-            <a href="quickAccess.html">Home</a>
-            <a href="about.html">About</a>
-            <a href="studentDashboard.html"><img src="assets/profile.png" alt="Profile" class="logo"></a>
-        </div>
-    </div>
-
+    <header id="header-placeholder"></header>
     <main class="report-container">
         <div class="report-header">
             <h1>DIGITAL REPORT CARD</h1>
@@ -109,7 +100,8 @@
             </button>
         </div>
     </main>
-
+    <footer id="footer-placeholder"></footer>
+    <script src="js/layout-loader.js"></script>
     <script src="js/reportCard.js"></script>
 </body>
 </html>

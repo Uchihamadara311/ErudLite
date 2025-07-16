@@ -5,7 +5,6 @@
     <title>PMS</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/studentDashboard.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap">
 </head>
 <body>
     <div id="header-placeholder"></div>
@@ -32,10 +31,10 @@
                 <p>SHOW MORE</p>
             </div>
             <div class="quickLinks">
-                <a href="studentReport.html">Student Report</a>
-                <a href="reportCard.html">Classroom</a>
+                <a href="studentReport.php">Student Report</a>
+                <a href="reportCard.php">Classroom</a>
                 <a href="">Clearance</a>
-                <a href="studentSchedule.html">Schedule</a>
+                <a href="studentSchedule.php">Schedule</a>
             </div>
     </main>
     <footer id="footer-placeholder"></footer>

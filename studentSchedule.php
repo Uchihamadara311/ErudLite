@@ -7,16 +7,7 @@
     <link rel="stylesheet" href="css/essential.css">
 </head>
 <body>
-    <div class="topBar">
-        <div>
-            <!-- <img src="assets/logo.png" alt="PMS Logo" id="logo" class="logo"> -->
-        </div>
-        <div class="navBar">
-            <a href="quickAccess.html">Home</a>
-            <a href="about.html">About</a>
-            <a href="studentDashboard.html"><img src="assets/profile.png" alt="Profile"  class="logo"></a>
-        </div>
-    </div>
+    <header id="header-placeholder"></header>
     <main style="border: 50px">
         <div class="topSchedule">
             <sectio style="text-align: center">
@@ -55,9 +46,7 @@
                 </tbody>
             </table>
     </main>
-
-    <footer>
-        <p>&copy PMS</p>
-    </footer>
+    <footer id="footer-placeholder"></footer>
+    <script src="js/layout-loader.js"></script>
 </body>
 </html>

@@ -5,21 +5,9 @@
     <title>PMS</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/about.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body>
-    <div class="topBar">
-        <div class="title">
-            <!-- THIS PART IS SUPPOSED TO BE A LOGO -->
-            <!-- <img src="assets/logo.png" alt="PMS Logo" id="logo" class="logo"> -->
-            ERUDLITE
-        </div>
-        <div class="navBar">
-            <a href="quickAccess.html">Home</a>
-            <a href="about.html">About</a>
-            <a href="studentDashboard.html"><img src="assets/profile.png" alt="Profile"  class="logo"></a>
-        </div>
-    </div>
+    <header id="header-placeholder"></header>
     <main >
         <section class="placeholder">
             <div>
@@ -49,8 +37,8 @@
             </div>
         </section>
     </main>
-    <footer>
-        <p>&copy PMS</p>
-    </footer>
+    <footer id="footer-placeholder"></footer>
+    <script src="js/layout-loader.js"></script>
+    <script src="js/hover-background.js"></script>
 </body>
 </html>

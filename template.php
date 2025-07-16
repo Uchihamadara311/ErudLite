@@ -9,14 +9,14 @@
 <body>
     <header>
         <div class="topBar">
-            <a class="logo-text" href="quickAccess.html">
+            <a class="logo-text" href="quickAccess.php">
                 <img src="assets/logo.png" alt="PMS Logo" class="logo">
                 <h3>ERUDLITE</h3>
             </a>
             <div class="navBar">
-                <a href="about.html">About</a>
+                <a href="about.php">About</a>
                 <a href="">Settings</a>
-                <a href="studentDashboard.html"><img src="assets/profile.png" alt="Profile"  class="logo"></a>
+                <a href="studentDashboard.php"><img src="assets/profile.png" alt="Profile"  class="logo"></a>
             </div>
         </div>
     </header>
