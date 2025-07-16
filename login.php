@@ -12,16 +12,17 @@ $error_message = "";
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
-    $stmt = $conn->prepare("SELECT password_hash FROM users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT password_hash, permissions FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $stmt->store_result();
 
     if($stmt->num_rows > 0) {
-        $stmt->bind_result($password_hash);
+        $stmt->bind_result($password_hash, $permissions);
         $stmt->fetch();
         if(password_verify($password, $password_hash)) {
             $_SESSION['email'] = $email;
+            $_SESSION['permissions'] = $permissions;
             header("Location: logout_button.php");
             exit();
         } else {
