@@ -18,7 +18,7 @@ if(!isset($_SESSION['email'])) {
 </head>
 <body>
     <div id="header-placeholder"></div>
-    <div class="background-change">test</div>
+    <div class="background-change"></div>
     <main>
         <div class="choice-section">
             <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
