@@ -2,14 +2,14 @@
     background-color: var(--primary-color);
     padding: 20px;
     border-radius: 0 0 10px 10px;
-    color: white;
+    color: var(--background-white);
     border-bottom: 4px solid var(--text-color);
 }
 
 .topSchedule button {
     padding: 10px 20px;
     background-color: var(--secondary-color);
-    color: white;
+    color: var(--background-white);
     border: none;
     border-radius: 5px;
     cursor: pointer;

@@ -24,6 +24,56 @@
   --success-color: #059669;        /* Academic Green */
   --warning-color: #dc2626;        /* Academic Red */
   --error-color: #ef4444;          /* Bright Red */
+  
+  /* Admin Management Colors */
+  --admin-primary: #3498db;        /* Admin Blue */
+  --admin-primary-dark: #2980b9;   /* Admin Blue Hover */
+  --admin-text: #2c3e50;          /* Admin Dark Text */
+  --admin-text-light: #34495e;    /* Admin Medium Text */
+  --admin-text-muted: #7f8c8d;    /* Admin Muted Text */
+  --admin-success: #27ae60;       /* Admin Green */
+  --admin-border: #e1e8ed;        /* Admin Border */
+  --admin-border-light: #ecf0f1;  /* Admin Light Border */
+  --admin-bg-light: #f8f9fa;      /* Admin Light Background */
+  --admin-bg-lighter: #fdfdfd;    /* Admin Lighter Background */
+  
+  /* Message Colors */
+  --message-success-bg: #d4edda;   /* Success Message Background */
+  --message-success-text: #155724; /* Success Message Text */
+  --message-success-border: #c3e6cb; /* Success Message Border */
+  --message-error-bg: #f8d7da;     /* Error Message Background */
+  --message-error-text: #721c24;   /* Error Message Text */
+  --message-error-border: #f5c6cb; /* Error Message Border */
+  
+  /* Table Colors */
+  --table-header-bg: #34495e;     /* Table Header Background */
+  --table-header-text: #ffffff;   /* Table Header Text */
+  
+  /* About Page Colors */
+  --about-overlay-start: rgba(255, 240, 224, 1);  /* About Overlay Start */
+  --about-overlay-mid: rgba(94, 67, 67, 0.5);     /* About Overlay Middle */
+  --about-overlay-end: rgba(255, 240, 224, 1);    /* About Overlay End */
+  --about-glass-bg: rgba(255, 255, 255, 0.1);     /* About Glass Background */
+  --about-glass-hover: rgba(255, 255, 255, 0.3);  /* About Glass Hover */
+  --about-border: rgba(255, 255, 255, 0.4);       /* About Border */
+  --about-shadow: rgba(255, 255, 255, 0.5);       /* About Shadow */
+  --about-shadow-hover: rgba(255, 255, 255, 0.8); /* About Shadow Hover */
+  
+  /* Navigation Colors */
+  --nav-bg: #8de9b3;              /* Navigation Background */
+  --nav-text: #2a794e;            /* Navigation Text */
+  --nav-hover: rgba(0, 0, 0, 0.6); /* Navigation Hover */
+  
+  /* Shadow & Effect Colors */
+  --shadow-light: rgba(0, 0, 0, 0.1);     /* Light Shadow */
+  --shadow-medium: rgba(0, 0, 0, 0.2);    /* Medium Shadow */
+  --shadow-dark: rgba(0, 0, 0, 0.3);      /* Dark Shadow */
+  --border-light: rgba(255, 255, 255, 0.3); /* Light Border */
+  --border-medium: rgba(255, 255, 255, 0.7); /* Medium Border */
+  
+  /* Responsive Breakpoints (for reference) */
+  --breakpoint-mobile: 768px;
+  --breakpoint-tablet: 1024px;
 }
 
 
@@ -55,7 +105,7 @@ body {
   align-items: center;
   font-size: 2em;
   font-weight: bold;
-  color: #2a794e;
+  color: var(--nav-text);
   text-decoration: none;
 }
 
@@ -67,7 +117,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 0 10px;
-  background-color: #8de9b3;
+  background-color: var(--nav-bg);
   position: sticky;
   z-index: 100; /* Ensure header is above content */
 }
@@ -89,7 +139,7 @@ body {
 
 .navBar a {
   padding: 0px 10px;
-  color: black;
+  color: var(--text-color);
   text-decoration: none;
 }
 
@@ -105,7 +155,7 @@ footer {
 
 footer a {
   text-decoration: none;
-  color: white;
+  color: var(--background-white);
 }
 
 footer a:hover {

@@ -1,53 +1,106 @@
-<?php 
+<?php
 require_once 'includes/db.php';
 
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+// Start session only once (check db.php for session_start duplication)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+if (!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
     header("Location: quickAccess.php");
     exit();
 }
 
-
-if($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Check if this is actually user data and not other data
-    if (!isset($_POST['first_name']) || !isset($_POST['last_name']) || !isset($_POST['email'])) {
-        $error_message = "Invalid form data for user management.";
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Validate all required fields
+    $required = [
+        'first_name','last_name','email','address','nationality',
+        'gender','contact_number','emergency_contact','permissions','password'
+    ];
+    $missing = [];
+    foreach ($required as $field) {
+        if (empty($_POST[$field])) $missing[] = $field;
+    }
+    if (!empty($missing)) {
+        $error_message = "Missing required fields: " . implode(', ', $missing);
     } else {
-        // Instructor fields (Essential)
-        $first_name = $_POST['first_name'];
-        $last_name = $_POST['last_name'];
-        $email = $_POST['email'];
-        $address = $_POST['address'];
-        $nationality = $_POST['nationality'];
-        $gender = $_POST['gender'];
-        $contact_number = $_POST['contact_number'];
-        $emergency_contact = $_POST['emergency_contact'];
-        $permissions = $_POST['permissions'];
-        $password_hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
+        // Sanitize input
+        $first_name = trim(htmlspecialchars($_POST['first_name']));
+        $last_name = trim(htmlspecialchars($_POST['last_name']));
+        $email = trim(htmlspecialchars($_POST['email']));
+        $address = trim(htmlspecialchars($_POST['address']));
+        $nationality = trim(htmlspecialchars($_POST['nationality']));
+        $gender = trim(htmlspecialchars($_POST['gender']));
+        $contact_number = trim(htmlspecialchars($_POST['contact_number']));
+        $emergency_contact = trim(htmlspecialchars($_POST['emergency_contact']));
+        $permissions = trim(htmlspecialchars($_POST['permissions']));
+        $password = $_POST['password'];
+        $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
-        // Instructor fields (Optional)
-        $specialization = !empty($_POST['specialization']) ? $_POST['specialization'] : '';
+        // Optional
+        $specialization = !empty($_POST['specialization']) ? trim(htmlspecialchars($_POST['specialization'])) : '';
 
-        // Instructor Info (Essential)
-        $sql = "INSERT INTO users (first_name, last_name, email, address, nationality, gender, contact_number, emergency_contact, permissions, password_hash)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssssssss", $first_name, $last_name, $email, $address, $nationality, $gender, $contact_number, $emergency_contact, $permissions, $password_hash);
-        
-        if ($stmt->execute()) {
+        // Use transaction to ensure atomicity
+        $conn->begin_transaction();
+        try {
+            // Insert user
+            $sql = "INSERT INTO users (first_name, last_name, email, address, nationality, gender, contact_number, emergency_contact, permissions, password_hash)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            if (!$stmt) {
+                throw new Exception("Error preparing user statement: " . $conn->error);
+            }
+            $stmt->bind_param(
+                "ssssssssss",
+                $first_name,
+                $last_name,
+                $email,
+                $address,
+                $nationality,
+                $gender,
+                $contact_number,
+                $emergency_contact,
+                $permissions,
+                $password_hash
+            );
+            if (!$stmt->execute()) {
+                throw new Exception("Error registering user: " . $stmt->error);
+            }
             $user_id = $conn->insert_id;
-            
-            // Instructor Info (Optional)
+            $stmt->close();
+
+            // Insert into respective role table
             if ($permissions === 'Instructor') {
                 $sql2 = "INSERT INTO instructors (instructor_id, hire_date, employ_status, specialization)
                          VALUES (?, CURRENT_DATE, 'Active', ?)";
                 $stmt2 = $conn->prepare($sql2);
+                if (!$stmt2) {
+                    throw new Exception("Error preparing instructor statement: " . $conn->error);
+                }
                 $stmt2->bind_param("is", $user_id, $specialization);
-                $stmt2->execute();
+                if (!$stmt2->execute()) {
+                    throw new Exception("Error registering instructor: " . $stmt2->error);
+                }
+                $stmt2->close();
+            } elseif ($permissions === 'Student') {
+                $sql2 = "INSERT INTO students (student_id)
+                         VALUES (?)";
+                $stmt2 = $conn->prepare($sql2);
+                if (!$stmt2) {
+                    throw new Exception("Error preparing student statement: " . $conn->error);
+                }
+                $stmt2->bind_param("i", $user_id);
+                if (!$stmt2->execute()) {
+                    throw new Exception("Error registering student: " . $stmt2->error);
+                }
+                $stmt2->close();
             }
-            
+
+            $conn->commit();
             $success_message = "User registered successfully!";
-        } else {
-            $error_message = "Error registering user: " . $stmt->error;
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error_message = htmlspecialchars($e->getMessage());
         }
     }
 }
@@ -164,8 +217,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $sql = "SELECT * FROM users ORDER BY permissions, first_name ASC";
                         $result = $conn->query($sql);
                         
-                        if ($result->num_rows > 0) {
-                            while($row = $result->fetch_assoc()) {
+                        if ($result && $result->num_rows > 0) {
+                            while ($row = $result->fetch_assoc()) {
                                 echo "<tr>";
                                 echo "<td>" . htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) . "</td>";
                                 echo "<td>" . htmlspecialchars($row['email']) . "</td>";
@@ -196,7 +249,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         document.addEventListener('DOMContentLoaded', function() {
             var role = document.getElementById('permissions').value;
             var instructorFields = document.getElementById('instructorFields');
-            if(role === 'Instructor') instructorFields.classList.remove('hidden');
+            if (role === 'Instructor') instructorFields.classList.remove('hidden');
         });
     </script>
 </body>

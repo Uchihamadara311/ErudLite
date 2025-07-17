@@ -2,14 +2,14 @@
     background-color: var(--secondary-light);
     padding: 20px;
     border-radius: 0 0 10px 10px;
-    color: white;
+    color: var(--background-white);
     border-bottom: 4px solid var(--secondary-dark);
 }
 
 .topReport button {
     padding: 10px 20px;
     background-color: var(--secondary-dark);
-    color: white;
+    color: var(--background-white);
     border: none;
     border-radius: 5px;
     cursor: pointer;
