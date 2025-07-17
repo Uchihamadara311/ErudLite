@@ -369,6 +369,20 @@ body:has([id*="users-table"]) .form-title::before {
     border-radius: 12px;
 }
 
+.autocomplete-suggestion .user-name {
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.autocomplete-suggestion .user-role {
+    font-size: 0.85em;
+    color: #7f8c8d;
+    background-color: #ecf0f1;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .admin-container {

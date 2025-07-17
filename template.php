@@ -22,8 +22,8 @@ if(!isset($_SESSION['email'])) {
                 <img src="assets/logo.png" alt="PMS Logo" class="logo">
                 <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
                     <h3>ERUDLITE [ADMIN]</h3>
-                <?php elseif(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Teacher'): ?>
-                    <h3>ERUDLITE [TEACHER]</h3>
+                <?php elseif(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Instructor'): ?>
+                    <h3>ERUDLITE [Instructor]</h3>
                 <?php else: ?>
                     <h3>ERUDLITE</h3>
                 <?php endif; ?>

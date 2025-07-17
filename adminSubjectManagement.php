@@ -186,6 +186,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
-    <script src="js/subjectManage.js" defer></script>
+    <script src="js/adminManage.js"></script>
 </body>
 </html>

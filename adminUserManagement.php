@@ -12,18 +12,187 @@ if (!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Validate all required fields
-    $required = [
-        'first_name','last_name','email','address','nationality',
-        'gender','contact_number','emergency_contact','permissions','password'
-    ];
-    $missing = [];
-    foreach ($required as $field) {
-        if (empty($_POST[$field])) $missing[] = $field;
-    }
-    if (!empty($missing)) {
-        $error_message = "Missing required fields: " . implode(', ', $missing);
+    $operation = isset($_POST['operation']) ? $_POST['operation'] : 'add';
+    $user_id = isset($_POST['user_id']) ? (int)$_POST['user_id'] : 0;
+
+    if ($operation == 'delete' && $user_id > 0) {
+        // Delete user
+        $conn->begin_transaction();
+        try {
+            // Delete from role-specific tables first
+            $sql = "DELETE FROM instructors WHERE instructor_id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            
+            $sql = "DELETE FROM students WHERE student_id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            
+            // Delete from users table
+            $sql = "DELETE FROM users WHERE user_id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $user_id);
+            
+            if ($stmt->execute()) {
+                if ($stmt->affected_rows > 0) {
+                    $conn->commit();
+                    $success_message = "User deleted successfully!";
+                } else {
+                    $conn->rollback();
+                    $error_message = "User not found or already deleted.";
+                }
+            } else {
+                $conn->rollback();
+                $error_message = "Error deleting user: " . $stmt->error;
+            }
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error_message = "Error deleting user: " . $e->getMessage();
+        }
+    } else if ($operation == 'edit' && $user_id > 0) {
+        // Update existing user
+        $first_name = trim(htmlspecialchars($_POST['first_name']));
+        $last_name = trim(htmlspecialchars($_POST['last_name']));
+        $email = trim(htmlspecialchars($_POST['email']));
+        $address = trim(htmlspecialchars($_POST['address']));
+        $nationality = trim(htmlspecialchars($_POST['nationality']));
+        $gender = trim(htmlspecialchars($_POST['gender']));
+        $contact_number = trim(htmlspecialchars($_POST['contact_number']));
+        $emergency_contact = trim(htmlspecialchars($_POST['emergency_contact']));
+        $permissions = trim(htmlspecialchars($_POST['permissions']));
+        $specialization = !empty($_POST['specialization']) ? trim(htmlspecialchars($_POST['specialization'])) : '';
+        
+        $conn->begin_transaction();
+        try {
+            // Check if password should be updated
+            $password = trim($_POST['password']);
+            if (!empty($password)) {
+                // Update user table with new password
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                $sql = "UPDATE users SET first_name = ?, last_name = ?, email = ?, address = ?, nationality = ?, gender = ?, contact_number = ?, emergency_contact = ?, permissions = ?, password_hash = ? WHERE user_id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("ssssssssssi", $first_name, $last_name, $email, $address, $nationality, $gender, $contact_number, $emergency_contact, $permissions, $password_hash, $user_id);
+            } else {
+                // Update user table without changing password
+                $sql = "UPDATE users SET first_name = ?, last_name = ?, email = ?, address = ?, nationality = ?, gender = ?, contact_number = ?, emergency_contact = ?, permissions = ? WHERE user_id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("sssssssssi", $first_name, $last_name, $email, $address, $nationality, $gender, $contact_number, $emergency_contact, $permissions, $user_id);
+            }
+            
+            if ($stmt->execute()) {
+                $user_updated = $stmt->affected_rows > 0;
+                
+                // Handle role-specific updates
+                $role_updated = false;
+                
+                // Get current user permissions to check for role changes
+                $current_role_sql = "SELECT permissions FROM users WHERE user_id = ?";
+                $current_role_stmt = $conn->prepare($current_role_sql);
+                $current_role_stmt->bind_param("i", $user_id);
+                $current_role_stmt->execute();
+                $current_role_result = $current_role_stmt->get_result();
+                $current_role_row = $current_role_result->fetch_assoc();
+                $current_role = $current_role_row['permissions'];
+                
+                // Handle instructor role
+                if ($permissions === 'Instructor') {
+                    // Check if instructor record exists
+                    $check_instructor_sql = "SELECT instructor_id FROM instructors WHERE instructor_id = ?";
+                    $check_instructor_stmt = $conn->prepare($check_instructor_sql);
+                    $check_instructor_stmt->bind_param("i", $user_id);
+                    $check_instructor_stmt->execute();
+                    $instructor_exists = $check_instructor_stmt->get_result()->num_rows > 0;
+                    
+                    if ($instructor_exists) {
+                        // Update existing instructor record
+                        $sql2 = "UPDATE instructors SET specialization = ? WHERE instructor_id = ?";
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("si", $specialization, $user_id);
+                        if ($stmt2->execute()) {
+                            $role_updated = true;
+                        }
+                    } else {
+                        // Create new instructor record
+                        $sql2 = "INSERT INTO instructors (instructor_id, hire_date, employ_status, specialization) VALUES (?, CURRENT_DATE, 'Active', ?)";
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("is", $user_id, $specialization);
+                        if ($stmt2->execute()) {
+                            $role_updated = true;
+                        }
+                    }
+                } else {
+                    // If changing from instructor to another role, delete instructor record
+                    if ($current_role === 'Instructor') {
+                        $sql2 = "DELETE FROM instructors WHERE instructor_id = ?";
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("i", $user_id);
+                        if ($stmt2->execute()) {
+                            $role_updated = true;
+                        }
+                    }
+                }
+                
+                // Handle student role
+                if ($permissions === 'Student') {
+                    // Check if student record exists
+                    $check_student_sql = "SELECT student_id FROM students WHERE student_id = ?";
+                    $check_student_stmt = $conn->prepare($check_student_sql);
+                    $check_student_stmt->bind_param("i", $user_id);
+                    $check_student_stmt->execute();
+                    $student_exists = $check_student_stmt->get_result()->num_rows > 0;
+                    
+                    if (!$student_exists) {
+                        // Create new student record
+                        $sql2 = "INSERT INTO students (student_id) VALUES (?)";
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("i", $user_id);
+                        if ($stmt2->execute()) {
+                            $role_updated = true;
+                        }
+                    }
+                } else {
+                    // If changing from student to another role, delete student record
+                    if ($current_role === 'Student') {
+                        $sql2 = "DELETE FROM students WHERE student_id = ?";
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("i", $user_id);
+                        if ($stmt2->execute()) {
+                            $role_updated = true;
+                        }
+                    }
+                }
+                
+                // Check if any updates were made
+                if ($user_updated || $role_updated) {
+                    $conn->commit();
+                    $success_message = "User updated successfully!";
+                } else {
+                    $conn->rollback();
+                    $error_message = "No changes were made or user not found.";
+                }
+            } else {
+                $conn->rollback();
+                $error_message = "Error updating user: " . $stmt->error;
+            }
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error_message = "Error updating user: " . $e->getMessage();
+        }
     } else {
+        // Validate all required fields
+        $required = [
+            'first_name','last_name','email','address','nationality',
+            'gender','contact_number','emergency_contact','permissions','password'
+        ];
+        $missing = [];
+        foreach ($required as $field) {
+            if (empty($_POST[$field])) $missing[] = $field;
+        }
+        if (!empty($missing)) {
+            $error_message = "Missing required fields: " . implode(', ', $missing);
+        } else {
         // Sanitize input
         $first_name = trim(htmlspecialchars($_POST['first_name']));
         $last_name = trim(htmlspecialchars($_POST['last_name']));
@@ -103,6 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error_message = htmlspecialchars($e->getMessage());
         }
     }
+    }
 }
 ?>
 <html lang="en">
@@ -113,7 +283,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="css/adminManagement.css">
-    <style>.hidden { display:none; }</style>
 </head>
 <body>
     <div id="header-placeholder"></div>
@@ -129,8 +298,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <?php endif; ?>
         
         <section class="form-section">
-            <h2 class="form-title">Add New User</h2>
-            <form method="POST" action="adminUserManagement.php">
+            <h2 class="form-title" id="form-title">Add New User</h2>
+            <form method="POST" action="adminUserManagement.php" id="user-form">
+                <input type="hidden" id="operation" name="operation" value="add">
+                <input type="hidden" id="user_id" name="user_id" value="">
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label" for="first_name">First Name *</label>
@@ -142,7 +313,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="email">Email *</label>
-                        <input class="form-input" name="email" id="email" type="email" placeholder="Enter email address" required>
+                        <div class="autocomplete-container">
+                            <input class="form-input" name="email" id="email" type="email" placeholder="Enter email address" required autocomplete="off">
+                            <div class="autocomplete-suggestions" id="user-suggestions"></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="contact_number">Contact Number *</label>
@@ -178,7 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="password">Password *</label>
+                        <label class="form-label" for="password" id="password-label">Password *</label>
                         <input class="form-input" name="password" id="password" type="password" placeholder="Enter password" required>
                     </div>
                 </div>
@@ -188,7 +362,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <input class="form-input" name="specialization" id="specialization" placeholder="Enter specialization (optional)">
                 </div>
 
-                <button type="submit" class="submit-btn">Register User</button>
+                <button type="submit" class="submit-btn" id="submit-btn">Register User</button>
+                <button type="button" class="cancel-btn" id="cancel-btn" style="display: none; margin-left: 10px;" onclick="resetForm()">Cancel</button>
+                <button type="button" class="delete-btn" id="delete-btn" style="display: none; margin-left: 10px;" onclick="deleteCurrentItem()">Delete User</button>
             </form>
         </section>
         
@@ -201,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
             </div>
             <div class="table-container">
-                <table class="subjects-table" id="subjects-table">
+                <table class="subjects-table" id="users-table">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -214,12 +390,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </thead>
                     <tbody>
                         <?php
-                        $sql = "SELECT * FROM users ORDER BY permissions, first_name ASC";
+                        $sql = "SELECT u.user_id, u.first_name, u.last_name, u.email, u.permissions, u.contact_number, u.gender, u.nationality, u.address, u.emergency_contact, i.specialization 
+                                FROM users u 
+                                LEFT JOIN instructors i ON u.user_id = i.instructor_id 
+                                ORDER BY u.permissions, u.first_name ASC";
                         $result = $conn->query($sql);
                         
                         if ($result && $result->num_rows > 0) {
                             while ($row = $result->fetch_assoc()) {
-                                echo "<tr>";
+                                echo "<tr class='clickable-row' onclick='editUser(" . 
+                                     $row['user_id'] . ", {" .
+                                     "name: \"" . htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) . "\", " .
+                                     "email: \"" . htmlspecialchars($row['email']) . "\", " .
+                                     "first_name: \"" . htmlspecialchars($row['first_name']) . "\", " .
+                                     "last_name: \"" . htmlspecialchars($row['last_name']) . "\", " .
+                                     "permissions: \"" . htmlspecialchars($row['permissions']) . "\", " .
+                                     "contact_number: \"" . htmlspecialchars($row['contact_number']) . "\", " .
+                                     "gender: \"" . htmlspecialchars($row['gender']) . "\", " .
+                                     "nationality: \"" . htmlspecialchars($row['nationality']) . "\", " .
+                                     "address: \"" . htmlspecialchars($row['address']) . "\", " .
+                                     "emergency_contact: \"" . htmlspecialchars($row['emergency_contact']) . "\", " .
+                                     "specialization: \"" . htmlspecialchars($row['specialization'] ?: '') . "\"" .
+                                     "})'>";
                                 echo "<td>" . htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) . "</td>";
                                 echo "<td>" . htmlspecialchars($row['email']) . "</td>";
                                 echo "<td><span class='grade-badge'>" . htmlspecialchars($row['permissions']) . "</span></td>";
@@ -239,18 +431,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
-    <script src="js/searchBar.js"></script>
-    <script>
-        document.getElementById('permissions').addEventListener('change', function() {
-            var instructorFields = document.getElementById('instructorFields');
-            instructorFields.classList.add('hidden');
-            if (this.value === 'Instructor') instructorFields.classList.remove('hidden');
-        });
-        document.addEventListener('DOMContentLoaded', function() {
-            var role = document.getElementById('permissions').value;
-            var instructorFields = document.getElementById('instructorFields');
-            if (role === 'Instructor') instructorFields.classList.remove('hidden');
-        });
-    </script>
+    <script src="js/adminManage.js"></script>
 </body>
 </html>
