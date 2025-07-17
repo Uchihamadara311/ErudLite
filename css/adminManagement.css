@@ -104,6 +104,7 @@ body:has([id*="users-table"]) .form-title::before {
     border: 2px solid var(--admin-border);
     border-radius: 8px;
     font-size: 1rem;
+    width: 100%;
     transition: border-color 0.3s ease;
     background-color: var(--admin-bg-light);
 }
@@ -287,6 +288,85 @@ body:has([id*="users-table"]) .form-title::before {
     border-color: var(--cancel-btn-hover-border);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Delete button styles */
+.delete-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: 2px solid #e74c3c;
+    padding: 12px 30px;
+    font-size: 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.delete-btn:hover {
+    background-color: #c0392b;
+    color: white;
+    border-color: #c0392b;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+/* Utility classes */
+.hidden { 
+    display: none; 
+}
+
+/* Autocomplete styles */
+.autocomplete-container {
+    position: relative;
+}
+
+.autocomplete-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.autocomplete-suggestion {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+}
+
+.autocomplete-suggestion:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-suggestion:hover,
+.autocomplete-suggestion.active {
+    background-color: #f8f9fa;
+}
+
+.autocomplete-suggestion .subject-name {
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.autocomplete-suggestion .subject-grade {
+    font-size: 0.85em;
+    color: #7f8c8d;
+    background-color: #ecf0f1;
+    padding: 2px 8px;
+    border-radius: 12px;
 }
 
 /* Responsive Design */

@@ -8,46 +8,68 @@ if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
 
 
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $subject_name = $_POST['subject_name'];
-    $description = isset($_POST['description']) ? $_POST['description'] : '';
-    $grade_level = isset($_POST['grade_level']) ? (int)$_POST['grade_level'] : 0;
-    $requirements = isset($_POST['requirements']) ? $_POST['requirements'] : '';
     $operation = isset($_POST['operation']) ? $_POST['operation'] : 'add';
     $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : 0;
 
-    if ($operation == 'edit' && $subject_id > 0) {
-        // Update existing subject using subject_id
-        $sql = "UPDATE subjects SET subject_name = ?, description = ?, grade_level = ?, requirements = ? WHERE subject_id = ?";
+    if ($operation == 'delete' && $subject_id > 0) {
+        // Delete subject
+        $sql = "DELETE FROM subjects WHERE subject_id = ?";
         $stmt = $conn->prepare($sql);
         
         if ($stmt) {
-            $stmt->bind_param("ssisi", $subject_name, $description, $grade_level, $requirements, $subject_id);
+            $stmt->bind_param("i", $subject_id);
             if ($stmt->execute()) {
                 if ($stmt->affected_rows > 0) {
-                    $success_message = "Subject updated successfully!";
+                    $success_message = "Subject deleted successfully!";
                 } else {
-                    $error_message = "No changes were made or subject not found.";
+                    $error_message = "Subject not found or already deleted.";
                 }
             } else {
-                $error_message = "Error executing update query: " . $stmt->error;
+                $error_message = "Error deleting subject: " . $stmt->error;
             }
         } else {
-            $error_message = "Error preparing update statement: " . $conn->error;
+            $error_message = "Error preparing delete statement: " . $conn->error;
         }
     } else {
-        // Insert new subject
-        $sql = "INSERT INTO subjects (subject_name, description, grade_level, requirements) VALUES (?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        
-        if ($stmt) {
-            $stmt->bind_param("ssis", $subject_name, $description, $grade_level, $requirements);
-            if ($stmt->execute()) {
-                $success_message = "Subject added successfully!";
+        $subject_name = $_POST['subject_name'];
+        $description = isset($_POST['description']) ? $_POST['description'] : '';
+        $grade_level = isset($_POST['grade_level']) ? (int)$_POST['grade_level'] : 0;
+        $requirements = isset($_POST['requirements']) ? $_POST['requirements'] : '';
+
+        if ($operation == 'edit' && $subject_id > 0) {
+            // Update existing subject using subject_id
+            $sql = "UPDATE subjects SET subject_name = ?, description = ?, grade_level = ?, requirements = ? WHERE subject_id = ?";
+            $stmt = $conn->prepare($sql);
+            
+            if ($stmt) {
+                $stmt->bind_param("ssisi", $subject_name, $description, $grade_level, $requirements, $subject_id);
+                if ($stmt->execute()) {
+                    if ($stmt->affected_rows > 0) {
+                        $success_message = "Subject updated successfully!";
+                    } else {
+                        $error_message = "No changes were made or subject not found.";
+                    }
+                } else {
+                    $error_message = "Error executing update query: " . $stmt->error;
+                }
             } else {
-                $error_message = "Error executing insert query: " . $stmt->error;
+                $error_message = "Error preparing update statement: " . $conn->error;
             }
         } else {
-            $error_message = "Error preparing insert statement: " . $conn->error;
+            // Insert new subject
+            $sql = "INSERT INTO subjects (subject_name, description, grade_level, requirements) VALUES (?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            
+            if ($stmt) {
+                $stmt->bind_param("ssis", $subject_name, $description, $grade_level, $requirements);
+                if ($stmt->execute()) {
+                    $success_message = "Subject added successfully!";
+                } else {
+                    $error_message = "Error executing insert query: " . $stmt->error;
+                }
+            } else {
+                $error_message = "Error preparing insert statement: " . $conn->error;
+            }
         }
     }
 }
@@ -59,62 +81,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Subject Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/adminManagement.css">
-    <style>
-        .hidden { display:none; }
-        
-        /* Autocomplete styles */
-        .autocomplete-container {
-            position: relative;
-        }
-        
-        .autocomplete-suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-top: none;
-            border-radius: 0 0 8px 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-        }
-        
-        .autocomplete-suggestion {
-            padding: 12px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-            transition: background-color 0.2s ease;
-            display: flex;
-            align-items: center;
-        }
-        
-        .autocomplete-suggestion:last-child {
-            border-bottom: none;
-        }
-        
-        .autocomplete-suggestion:hover,
-        .autocomplete-suggestion.active {
-            background-color: #f8f9fa;
-        }
-        
-        .autocomplete-suggestion .subject-name {
-            font-weight: 600;
-            color: #2c3e50;
-            flex: 1;
-        }
-        
-        .autocomplete-suggestion .subject-grade {
-            font-size: 0.85em;
-            color: #7f8c8d;
-            background-color: #ecf0f1;
-            padding: 2px 8px;
-            border-radius: 12px;
-        }
-    </style>
 </head>
 <body>
     <div id="header-placeholder"></div>
@@ -169,6 +135,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 <button type="submit" class="submit-btn" id="submit-btn">Add Subject</button>
                 <button type="button" class="cancel-btn" id="cancel-btn" style="display: none; margin-left: 10px;" onclick="resetForm()">Cancel</button>
+                <button type="button" class="delete-btn" id="delete-btn" style="display: none; margin-left: 10px;" onclick="deleteCurrentSubject()">Delete Subject</button>
             </form>
         </section>
         

@@ -178,8 +178,9 @@ function editSubject(subjectId, subjectName, description, gradeLevel, requiremen
     // Update submit button
     document.getElementById('submit-btn').textContent = 'Update Subject';
 
-    // Show cancel button
+    // Show cancel and delete buttons
     document.getElementById('cancel-btn').style.display = 'inline-block';
+    document.getElementById('delete-btn').style.display = 'inline-block';
 
     // Set operation mode to edit
     document.getElementById('operation').value = 'edit';
@@ -202,8 +203,9 @@ function resetForm() {
     // Reset submit button
     document.getElementById('submit-btn').textContent = 'Add Subject';
 
-    // Hide cancel button
+    // Hide cancel and delete buttons
     document.getElementById('cancel-btn').style.display = 'none';
+    document.getElementById('delete-btn').style.display = 'none';
 
     // Reset operation mode to add
     document.getElementById('operation').value = 'add';
@@ -217,16 +219,52 @@ function resetForm() {
     document.getElementById('subject_id').value = '';
 }
 
+function deleteCurrentSubject() {
+    const subjectId = document.getElementById('subject_id').value;
+    const subjectName = document.getElementById('subject_name').value;
+    
+    if (subjectId && subjectName) {
+        deleteSubject(subjectId, subjectName);
+    }
+}
+
+function deleteSubject(subjectId, subjectName) {
+    if (confirm('Are you sure you want to delete the subject "' + subjectName + '"? This action cannot be undone.')) {
+        // Create a form to submit the delete request
+        const deleteForm = document.createElement('form');
+        deleteForm.method = 'POST';
+        deleteForm.action = 'adminSubjectManagement.php';
+        deleteForm.style.display = 'none';
+        
+        // Add hidden fields
+        const operationInput = document.createElement('input');
+        operationInput.type = 'hidden';
+        operationInput.name = 'operation';
+        operationInput.value = 'delete';
+        deleteForm.appendChild(operationInput);
+        
+        const subjectIdInput = document.createElement('input');
+        subjectIdInput.type = 'hidden';
+        subjectIdInput.name = 'subject_id';
+        subjectIdInput.value = subjectId;
+        deleteForm.appendChild(subjectIdInput);
+        
+        // Add form to document and submit
+        document.body.appendChild(deleteForm);
+        deleteForm.submit();
+    }
+}
+
 // Add hover effect for clickable rows
 document.addEventListener('DOMContentLoaded', function() {
-const rows = document.querySelectorAll('.clickable-row');
-rows.forEach(row => {
-    row.addEventListener('mouseenter', function() {
-        this.style.backgroundColor = '#f0f0f0';
-        this.style.cursor = 'pointer';
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f8f9fa';
+            this.style.cursor = 'pointer';
+        });
+        row.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+        });
     });
-    row.addEventListener('mouseleave', function() {
-        this.style.backgroundColor = '';
-    });
-});
 });
