@@ -5,6 +5,7 @@
     <title>PMS</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/studentDashboard.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap">
 </head>
 <body>
     <div id="header-placeholder"></div>

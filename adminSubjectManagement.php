@@ -35,6 +35,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Subject Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/adminManagement.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap">
     <style>.hidden { display:none; }</style>
 </head>
 <body>

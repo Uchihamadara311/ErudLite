@@ -60,6 +60,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="css/adminManagement.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap">
     <style>.hidden { display:none; }</style>
 </head>
 <body>
