@@ -37,15 +37,21 @@ if(!isset($_SESSION['email'])) {
                         <i class="fas fa-chevron-down"></i>
                     </a>
                     <div class="dropdown-content">
-                        <a href="studentDashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
-                        <a href="#"><i class="fas fa-user-cog"></i> Manage Account</a>
+                        <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
+                            <a href="adminLinks.php"><i class="fas fa-users"></i> Admin Dashboard</a>
+                        <?php elseif(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Instructor'): ?>
+                            <a href="instructorDashboard.php"><i class="fas fa-chalkboard-teacher"></i> Instructor Dashboard</a>
+                        <?php else: ?>
+                            <a href="studentDashboard.php"><i class="fas fa-user-graduate"></i> Student Dashboard</a>
+                        <?php endif; ?>
+                        <a href="manageAccount.php"><i class="fas fa-user-cog"></i> Manage Account</a>
                         <a href="includes/logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
             </div>
         </div>
     </header>
-    <footer>
+    <footer style="z-index: 1000>
         <p>&copy Erudlite PMS 2025</p>
     </footer>
 </body>

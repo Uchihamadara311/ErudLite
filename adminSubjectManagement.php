@@ -80,11 +80,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subject Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
+    <link rel="stylesheet" href="css/adminLinks.css">
     <link rel="stylesheet" href="css/adminManagement.css">
 </head>
 <body>
     <div id="header-placeholder"></div>
     <div class="admin-container">
+        <div class="admin-back-btn-wrap admin-back-btn-upperleft">
+            <a href="adminLinks.php" class="admin-back-btn"><i class="fa fa-arrow-left"></i> Back to Admin Dashboard</a>
+        </div>
         <h1 class="page-title">Subject Management</h1>
         
         <?php if (isset($success_message)): ?>

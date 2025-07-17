@@ -32,7 +32,7 @@ function addRecord($conn, $recordData) {
         // Insert record
         $sql = "INSERT INTO record (student_id, instructor_id, subject_id, school_year, term, grade, record_date) VALUES (?, ?, ?, ?, ?, ?, NOW())";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("iiiiss", $recordData['student_id'], $recordData['instructor_id'], $recordData['subject_id'], $recordData['school_year'], $recordData['term'], $recordData['grade']);
+        $stmt->bind_param("iiiiis", $recordData['student_id'], $recordData['instructor_id'], $recordData['subject_id'], $recordData['school_year'], $recordData['term'], $recordData['grade']);
         
         if ($stmt->execute()) {
             return "Record added successfully!";
@@ -161,11 +161,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Record Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="css/adminLinks.css">
     <link rel="stylesheet" href="css/adminManagement.css">
 </head>
 <body>
     <div id="header-placeholder"></div>
     <div class="admin-container">
+        <div class="admin-back-btn-wrap admin-back-btn-upperleft">
+            <a href="adminLinks.php" class="admin-back-btn"><i class="fa fa-arrow-left"></i> Back to Admin Dashboard</a>
+        </div>
         <h1 class="page-title">Record Management</h1>
         
         <?php if (isset($success_message)): ?>
@@ -273,7 +277,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     
                     <div class="form-group">
                         <label class="form-label" for="grade">Grade *</label>
-                        <input class="form-input" name="grade" id="grade" type="text" placeholder="Enter grade (e.g., A, B+, 95, etc.)" required>
+                        <input class="form-input" name="grade" id="grade" type="text" placeholder="Enter grade" required>
                     </div>
                 </div>
                 
@@ -301,7 +305,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <th>School Year</th>
                             <th>Term</th>
                             <th>Grade</th>
-                            <th>Record Date</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -335,7 +338,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 echo "<td>" . $row['school_year'] . "</td>";
                                 echo "<td>" . htmlspecialchars($row['term']) . "</td>";
                                 echo "<td><span class='grade-badge'>" . htmlspecialchars($row['grade']) . "</span></td>";
-                                echo "<td>" . date('M d, Y', strtotime($row['record_date'])) . "</td>";
                                 echo "</tr>";
                             }
                         } else {

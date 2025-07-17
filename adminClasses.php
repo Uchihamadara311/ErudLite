@@ -155,11 +155,15 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Class Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="css/adminLinks.css">
     <link rel="stylesheet" href="css/adminManagement.css">
 </head>
 <body>
     <div id="header-placeholder"></div>
     <div class="admin-container">
+        <div class="admin-back-btn-wrap admin-back-btn-upperleft">
+            <a href="adminLinks.php" class="admin-back-btn"><i class="fa fa-arrow-left"></i> Back to Admin Dashboard</a>
+        </div>
         <h1 class="page-title">Class Management</h1>
         
         <?php if (isset($success_message)): ?>

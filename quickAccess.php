@@ -30,10 +30,10 @@ if(!isset($_SESSION['email'])) {
                         Subject<br>Management
                     </span>
                 </a>
-                <a href="adminUserManagement.php">
+                <a href="adminLinks.php">
                     <span>
                         <i class="icon fa-solid fa-users"></i>
-                        <br>User<br>Management
+                        <br>Admin<br>Dashboard
                     </span>
                 </a>
                 <a href="">
@@ -42,10 +42,10 @@ if(!isset($_SESSION['email'])) {
                         <br>Reports<br>and Analytics
                     </span>
                 </a>
-                <a href="">
+                <a href="manageAccount.php">
                     <span>
                         <i class="icon fa-solid fa-cog"></i>
-                        <br>System<br>Settings
+                        <br>Manage<br>Account
                     </span>
                 </a>
             <?php else: ?>

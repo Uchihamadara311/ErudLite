@@ -1,0 +1,138 @@
+/* Back to Quick Access button styles */
+.admin-back-btn-wrap {
+    display: flex;
+    justify-content: center;
+}
+.admin-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--admin-primary);
+    color: #fff;
+    font-weight: 600;
+    font-size: 1.08em;
+    padding: 12px 32px;
+    border-radius: 8px;
+    text-decoration: none;
+    box-shadow: 0 2px 12px #3498db22;
+    border: none;
+    transition: background 0.18s, box-shadow 0.18s, transform 0.15s;
+    letter-spacing: 0.01em;
+}
+.admin-back-btn i {
+    font-size: 1.1em;
+    margin-right: 4px;
+}
+.admin-back-btn:hover {
+    background: var(--admin-primary-dark);
+    color: #fff;
+    box-shadow: 0 4px 18px #2980b944;
+    transform: translateY(-2px) scale(1.03);
+    text-decoration: none;
+}
+/* adminLinks.css - Custom enhancements for Admin Links page */
+body {
+    background: linear-gradient(120deg, var(--primary-pale) 0%, var(--background-color) 100%);
+    min-height: 100vh;
+}
+
+.admin-links-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0px 0 48px 0;
+}
+
+.page-title {
+    text-align: center;
+    font-size: 2.3em;
+    color: var(--admin-primary-dark);
+    font-weight: 800;
+    margin-bottom: 36px;
+    letter-spacing: 0.01em;
+    text-shadow: 0 2px 8px #dbeafe44;
+}
+
+.card-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: center;
+}
+
+.card-link.card {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--background-white);
+    border-radius: 18px;
+    padding: 38px 48px 32px 48px;
+    box-shadow: 0 4px 24px rgba(52, 152, 219, 0.10);
+    text-align: center;
+    min-width: 200px;
+    min-height: 180px;
+    transition: box-shadow 0.2s, background 0.2s, transform 0.18s;
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--admin-border-light);
+}
+.card-link.card:before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    left: -60px;
+    width: 120px;
+    height: 120px;
+    background: linear-gradient(135deg, var(--admin-primary)33 0%, #fff0 100%);
+    border-radius: 50%;
+    z-index: 0;
+}
+.card-link.card:hover {
+    background: var(--admin-bg-light);
+    box-shadow: 0 8px 32px rgba(52,152,219,0.18);
+    transform: translateY(-6px) scale(1.03);
+    border-color: var(--admin-primary-dark);
+}
+.card-link.card i {
+    font-size: 2.6em;
+    margin-bottom: 16px;
+    color: var(--admin-primary-dark);
+    z-index: 1;
+    transition: color 0.2s;
+}
+.card-link.card:hover i {
+    color: var(--admin-primary);
+}
+.card-link.card span {
+    font-size: 1.18em;
+    font-weight: 600;
+    color: var(--admin-text);
+    z-index: 1;
+    letter-spacing: 0.01em;
+}
+@media (max-width: 900px) {
+    .card-list {
+        gap: 18px;
+    }
+    .card-link.card {
+        min-width: 160px;
+        padding: 28px 18px 22px 18px;
+    }
+}
+@media (max-width: 700px) {
+    .admin-links-container {
+        padding: 12px 0 24px 0;
+    }
+    .card-list {
+        flex-direction: column;
+        gap: 18px;
+        max-width: 98vw;
+    }
+    .card-link.card {
+        min-width: 0;
+        width: 100%;
+        padding: 22px 8vw 18px 8vw;
+    }
+}
