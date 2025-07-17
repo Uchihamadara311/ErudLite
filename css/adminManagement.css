@@ -258,6 +258,37 @@ body:has([id*="users-table"]) .form-title::before {
     font-size: 1.1rem;
 }
 
+/* Clickable row styles */
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+    background-color: var(--table-hover-bg) !important;
+}
+
+/* Cancel button styles */
+.cancel-btn {
+    background-color: var(--cancel-btn-bg);
+    color: var(--cancel-btn-text);
+    border: 2px solid var(--cancel-btn-border);
+    padding: 12px 30px;
+    font-size: 1rem;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.cancel-btn:hover {
+    background-color: var(--cancel-btn-hover-bg);
+    color: var(--cancel-btn-hover-text);
+    border-color: var(--cancel-btn-hover-border);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .admin-container {

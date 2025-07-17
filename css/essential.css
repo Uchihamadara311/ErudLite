@@ -37,6 +37,17 @@
   --admin-bg-light: #f8f9fa;      /* Admin Light Background */
   --admin-bg-lighter: #fdfdfd;    /* Admin Lighter Background */
   
+  /* Cancel Button Colors */
+  --cancel-btn-bg: #f8f9fa;       /* Cancel Button Background */
+  --cancel-btn-text: #6c757d;     /* Cancel Button Text */
+  --cancel-btn-border: #6c757d;   /* Cancel Button Border */
+  --cancel-btn-hover-bg: #e9ecef; /* Cancel Button Hover Background */
+  --cancel-btn-hover-text: #495057; /* Cancel Button Hover Text */
+  --cancel-btn-hover-border: #495057; /* Cancel Button Hover Border */
+  
+  /* Table Hover Colors */
+  --table-hover-bg: #f8f9fa;      /* Table Row Hover Background */
+  
   /* Message Colors */
   --message-success-bg: #d4edda;   /* Success Message Background */
   --message-success-text: #155724; /* Success Message Text */

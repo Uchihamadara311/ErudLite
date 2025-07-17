@@ -12,19 +12,43 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $description = isset($_POST['description']) ? $_POST['description'] : '';
     $grade_level = isset($_POST['grade_level']) ? (int)$_POST['grade_level'] : 0;
     $requirements = isset($_POST['requirements']) ? $_POST['requirements'] : '';
+    $operation = isset($_POST['operation']) ? $_POST['operation'] : 'add';
+    $subject_id = isset($_POST['subject_id']) ? (int)$_POST['subject_id'] : 0;
 
-    $sql = "INSERT INTO subjects (subject_name, description, grade_level, requirements) VALUES (?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    
-    if ($stmt) {
-        $stmt->bind_param("ssis", $subject_name, $description, $grade_level, $requirements);
-        if ($stmt->execute()) {
-            $success_message = "Subject added successfully!";
+    if ($operation == 'edit' && $subject_id > 0) {
+        // Update existing subject using subject_id
+        $sql = "UPDATE subjects SET subject_name = ?, description = ?, grade_level = ?, requirements = ? WHERE subject_id = ?";
+        $stmt = $conn->prepare($sql);
+        
+        if ($stmt) {
+            $stmt->bind_param("ssisi", $subject_name, $description, $grade_level, $requirements, $subject_id);
+            if ($stmt->execute()) {
+                if ($stmt->affected_rows > 0) {
+                    $success_message = "Subject updated successfully!";
+                } else {
+                    $error_message = "No changes were made or subject not found.";
+                }
+            } else {
+                $error_message = "Error executing update query: " . $stmt->error;
+            }
         } else {
-            $error_message = "Error executing query: " . $stmt->error;
+            $error_message = "Error preparing update statement: " . $conn->error;
         }
     } else {
-        $error_message = "Error preparing statement: " . $conn->error;
+        // Insert new subject
+        $sql = "INSERT INTO subjects (subject_name, description, grade_level, requirements) VALUES (?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        
+        if ($stmt) {
+            $stmt->bind_param("ssis", $subject_name, $description, $grade_level, $requirements);
+            if ($stmt->execute()) {
+                $success_message = "Subject added successfully!";
+            } else {
+                $error_message = "Error executing insert query: " . $stmt->error;
+            }
+        } else {
+            $error_message = "Error preparing insert statement: " . $conn->error;
+        }
     }
 }
 ?>
@@ -35,7 +59,62 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Subject Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
     <link rel="stylesheet" href="css/adminManagement.css">
-    <style>.hidden { display:none; }</style>
+    <style>
+        .hidden { display:none; }
+        
+        /* Autocomplete styles */
+        .autocomplete-container {
+            position: relative;
+        }
+        
+        .autocomplete-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .autocomplete-suggestion {
+            padding: 12px 15px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .autocomplete-suggestion:last-child {
+            border-bottom: none;
+        }
+        
+        .autocomplete-suggestion:hover,
+        .autocomplete-suggestion.active {
+            background-color: #f8f9fa;
+        }
+        
+        .autocomplete-suggestion .subject-name {
+            font-weight: 600;
+            color: #2c3e50;
+            flex: 1;
+        }
+        
+        .autocomplete-suggestion .subject-grade {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            background-color: #ecf0f1;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+    </style>
 </head>
 <body>
     <div id="header-placeholder"></div>
@@ -51,12 +130,17 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         <?php endif; ?>
         
         <section class="form-section">
-            <h2 class="form-title">Add New Subject</h2>
-            <form method="POST" action="adminSubjectManagement.php">
+            <h2 class="form-title" id="form-title">Add New Subject</h2>
+            <form method="POST" action="adminSubjectManagement.php" id="subject-form">
+                <input type="hidden" id="operation" name="operation" value="add">
+                <input type="hidden" id="subject_id" name="subject_id" value="">
                 <div class="form-grid">
                     <div class="form-group">
                         <label class="form-label" for="subject_name">Subject Name *</label>
-                        <input class="form-input" type="text" id="subject_name" name="subject_name" placeholder="Enter subject name" required>
+                        <div class="autocomplete-container">
+                            <input class="form-input" type="text" id="subject_name" name="subject_name" placeholder="Enter subject name" required autocomplete="off">
+                            <div class="autocomplete-suggestions" id="subject-suggestions"></div>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -83,7 +167,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                 </div>
                 
-                <button type="submit" class="submit-btn">Add Subject</button>
+                <button type="submit" class="submit-btn" id="submit-btn">Add Subject</button>
+                <button type="button" class="cancel-btn" id="cancel-btn" style="display: none; margin-left: 10px;" onclick="resetForm()">Cancel</button>
             </form>
         </section>
         
@@ -106,12 +191,17 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </thead>
                     <tbody>
                         <?php
-                        $sql = "SELECT subject_name, description, grade_level, requirements FROM subjects ORDER BY grade_level, subject_name";
+                        $sql = "SELECT subject_id, subject_name, description, grade_level, requirements FROM subjects ORDER BY grade_level, subject_name";
                         $result = $conn->query($sql);
                         
                         if ($result->num_rows > 0) {
                             while($row = $result->fetch_assoc()) {
-                                echo "<tr>";
+                                echo "<tr class='clickable-row' onclick='editSubject(" . 
+                                     $row['subject_id'] . ", \"" . 
+                                     htmlspecialchars($row['subject_name']) . "\", \"" . 
+                                     htmlspecialchars($row['description']) . "\", " . 
+                                     $row['grade_level'] . ", \"" . 
+                                     htmlspecialchars($row['requirements']) . "\")'>";
                                 echo "<td>" . htmlspecialchars($row['subject_name']) . "</td>";
                                 echo "<td>" . htmlspecialchars($row['description'] ?: 'No description') . "</td>";
                                 echo "<td><span class='grade-badge'>Grade " . htmlspecialchars($row['grade_level']) . "</span></td>";
@@ -129,6 +219,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
-    <script src="js/search.js" defer></script>
+    <script src="js/subjectManage.js" defer></script>
 </body>
 </html>

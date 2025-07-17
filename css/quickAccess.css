@@ -17,7 +17,7 @@ main {
     height: 40rem;
     width: 40rem;
     border-radius: 100%;
-    box-shadow: inset 0px 0px 10px rgba(0, 0, 0, 0.1), 0px 0px 20px rgba(0, 0, 0, 0.1);
+    box-shadow: inset 0px 0px 10px rgba(0, 0, 0, 0.1), 0px 0px 20px rgba(0, 0, 0, 0.1), inset 0px 0px 200px rgba(255, 255, 255, 0.8);
     transition: all 0.3s ease-in-out;
 }
 
@@ -32,7 +32,7 @@ main {
     width: 50%;
     height: 50%;
     color: rgb(0, 0, 0);
-    border: 10px whitesmoke solid;
+    border: 10px rgba(245, 245, 245, 0.8) solid;
     /* Enhanced transition with smoother easing */
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     /* Add transform origin for smooth scaling */
@@ -87,13 +87,15 @@ main {
 
 /* Enhanced hover effects */
 main div a:hover {
-    border: 0px whitesmoke solid;
+    border: 0px rgba(245, 245, 245, 0.7) solid;
     transform: scale(1.05);
     filter: brightness(1.1);
     box-shadow: 
         inset 0px 0px 30px rgba(255, 255, 255, 0.3),
         0px 0px 30px rgba(0, 0, 0, 0.2);
     background-blend-mode: overlay;
+    z-index: 10; /* Ensure hovered element appears above others */
+    position: relative; /* Required for z-index to work */
 }
 
 /* Icon hover effects */
@@ -125,21 +127,25 @@ main div a:focus {
 .choice-section a:nth-child(1):hover {
     background-color: var(--primary-light);
     filter: brightness(1.15) saturate(1.1);
+    z-index: 10; /* Ensure hovered element appears above others */
 }
 
 .choice-section a:nth-child(2):hover {
     background-color: var(--secondary-light);
     filter: brightness(1.15) saturate(1.1);
+    z-index: 10; /* Ensure hovered element appears above others */
 }
 
 .choice-section a:nth-child(3):hover {
     background-color: var(--accent-color);
     filter: brightness(1.15) saturate(1.1);
+    z-index: 10; /* Ensure hovered element appears above others */
 }
 
 .choice-section a:nth-child(4):hover {
     background-color: var(--success-color);
     filter: brightness(1.15) saturate(1.1);
+    z-index: 10; /* Ensure hovered element appears above others */
 }
 
 /* Enhanced circular container hover effect */
@@ -224,5 +230,6 @@ main div a:hover {
     
     main div a:hover {
         transform: scale(1.03);
+        z-index: 10; /* Ensure hovered element appears above others */
     }
 }
