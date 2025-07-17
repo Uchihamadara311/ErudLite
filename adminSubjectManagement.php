@@ -143,7 +143,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             <div class="table-header">
                 <span>Existing Subjects</span>
             </div>
-            <div style="padding: 20px; background: white;">
+            <div style="padding: 20px; background: white">
                 <input type="text" id="searchBar" class="form-input" placeholder="Search subjects..." style="width: 100%; margin-bottom: 10px;">
             </div>
             <div class="table-container">
@@ -186,6 +186,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
-    <script src="js/adminManage.js"></script>
+    <script src="js/subjectManage.js" defer></script>
 </body>
 </html>
