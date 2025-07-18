@@ -81,7 +81,13 @@ function updateUser($conn, $user_id, $userData) {
                 $role_updated = $insert_inst->execute();
             }
         } else {
-            // Delete instructor record if changing from instructor
+            // Delete assigned_subject and schedule rows before deleting instructor record if changing from instructor
+            $delete_assigned = $conn->prepare("DELETE FROM assigned_subject WHERE instructor_id = ?");
+            $delete_assigned->bind_param("i", $user_id);
+            $delete_assigned->execute();
+            $delete_schedule = $conn->prepare("DELETE FROM schedule WHERE instructor_id = ?");
+            $delete_schedule->bind_param("i", $user_id);
+            $delete_schedule->execute();
             $delete_inst = $conn->prepare("DELETE FROM instructors WHERE instructor_id = ?");
             $delete_inst->bind_param("i", $user_id);
             $delete_inst->execute();
@@ -100,7 +106,13 @@ function updateUser($conn, $user_id, $userData) {
                 $role_updated = $insert_std->execute();
             }
         } else {
-            // Delete student record if changing from student
+            // Delete record and enrollments rows before deleting student record if changing from student
+            $delete_record = $conn->prepare("DELETE FROM record WHERE student_id = ?");
+            $delete_record->bind_param("i", $user_id);
+            $delete_record->execute();
+            $delete_enrollments = $conn->prepare("DELETE FROM enrollments WHERE student_id = ?");
+            $delete_enrollments->bind_param("i", $user_id);
+            $delete_enrollments->execute();
             $delete_std = $conn->prepare("DELETE FROM students WHERE student_id = ?");
             $delete_std->bind_param("i", $user_id);
             $delete_std->execute();

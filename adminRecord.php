@@ -206,6 +206,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                             }
                             ?>
                         </select>
+                       <div id="student-instructor-indicator" class="indicator-message" style="color: #007bff; font-size: 13px; margin-top: 4px; display: none;">
+                           Please select both a student and an instructor to list available subjects.
+                       </div>
                     </div>
                     
                     <div class="form-group">
@@ -228,23 +231,13 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                             }
                             ?>
                         </select>
+                       <div id="instructor-subjects-indicator" class="indicator-message" style="color: #28a745; font-size: 13px; margin-top: 4px; display: none;"></div>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label" for="subject_id">Subject *</label>
                         <select class="form-select" name="subject_id" id="subject_id" required>
                             <option value="">Select a Subject</option>
-                            <?php
-                            $subject_sql = "SELECT subject_id, subject_name, grade_level FROM subjects ORDER BY grade_level, subject_name";
-                            $subject_result = $conn->query($subject_sql);
-                            
-                            if ($subject_result->num_rows > 0) {
-                                while($subject = $subject_result->fetch_assoc()) {
-                                    echo "<option value='" . $subject['subject_id'] . "'>" . 
-                                         htmlspecialchars($subject['subject_name']) . " (Grade " . $subject['grade_level'] . ")</option>";
-                                }
-                            }
-                            ?>
                         </select>
                     </div>
                     
@@ -309,6 +302,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </thead>
                     <tbody>
                         <?php
+                        $current_year = date('Y');
                         $sql = "SELECT r.record_id, r.student_id, r.instructor_id, r.subject_id, r.school_year, r.term, r.grade, r.record_date,
                                        s.first_name AS student_first, s.last_name AS student_last, s.email AS student_email,
                                        i.first_name AS instructor_first, i.last_name AS instructor_last,
@@ -317,8 +311,16 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 JOIN users s ON r.student_id = s.user_id 
                                 JOIN users i ON r.instructor_id = i.user_id
                                 JOIN subjects sub ON r.subject_id = sub.subject_id
+                                JOIN enrollments e ON e.student_id = r.student_id
+                                JOIN classes c ON c.class_id = e.class_id
+                                WHERE r.school_year = ?
+                                  AND c.subject_id = r.subject_id
+                                  AND c.school_year = r.school_year
                                 ORDER BY r.record_date DESC, s.first_name, s.last_name";
-                        $result = $conn->query($sql);
+                        $stmt = $conn->prepare($sql);
+                        $stmt->bind_param('i', $current_year);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
                         
                         if ($result && $result->num_rows > 0) {
                             while($row = $result->fetch_assoc()) {
@@ -353,30 +355,98 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="js/layout-loader.js"></script>
     <script src="js/adminManage.js"></script>
     <script>
+    // Update subject dropdown based on selected student and year
+    function updateSubjectDropdown() {
+        var year = document.getElementById('school_year').value;
+        var instructorId = document.getElementById('instructor_id').value;
+        var subjectSelect = document.getElementById('subject_id');
+        var indicator = document.getElementById('student-instructor-indicator');
+        var instructorSubjectsIndicator = document.getElementById('instructor-subjects-indicator');
+        if (!instructorId || !year) {
+            subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
+            indicator.style.display = 'block';
+            updateInstructorSubjects();
+            return;
+        }
+        indicator.style.display = 'none';
+        fetch('get_instructor_subjects.php?instructor_id=' + instructorId + '&year=' + year)
+            .then(response => response.json())
+            .then(subjects => {
+                subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
+                subjects.forEach(function(subj) {
+                    subjectSelect.innerHTML += '<option value="' + subj.subject_id + '">' +
+                        subj.subject_name + ' (Grade ' + subj.grade_level + ')' + '</option>';
+                });
+            });
+        updateInstructorSubjects();
+    }
+
+   // Show all subjects the instructor is handling for the selected year
+   function updateInstructorSubjects() {
+       var instructorId = document.getElementById('instructor_id').value;
+       var year = document.getElementById('school_year').value;
+       var indicator = document.getElementById('instructor-subjects-indicator');
+       if (!instructorId || !year) {
+           indicator.style.display = 'none';
+           indicator.innerHTML = '';
+           return;
+       }
+       fetch('get_instructor_subjects.php?instructor_id=' + instructorId + '&year=' + year)
+           .then(response => response.json())
+           .then(subjects => {
+               if (subjects.length === 0) {
+                   indicator.style.display = 'block';
+                   indicator.innerHTML = 'No subjects assigned for this year.';
+               } else {
+                   indicator.style.display = 'block';
+                   indicator.innerHTML = 'Subjects handled: ' + subjects.map(function(subj) {
+                       return subj.subject_name + ' (Grade ' + subj.grade_level + ')';
+                   }).join(', ');
+               }
+           });
+   }
+   document.getElementById('instructor_id').addEventListener('change', updateInstructorSubjects);
+   document.getElementById('school_year').addEventListener('change', updateInstructorSubjects);
+    document.getElementById('school_year').addEventListener('change', updateSubjectDropdown);
+    document.getElementById('instructor_id').addEventListener('change', updateSubjectDropdown);
+    // On page load, if editing, update subject dropdown
+    window.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('school_year').value && document.getElementById('instructor_id').value) {
+            updateSubjectDropdown();
+        }
+    });
+    </script>
+    <script>
         // Override editRecord function for records
         function editRecord(recordId, recordData) {
             // Update form title
             document.getElementById('form-title').textContent = 'Edit Record';
-            
+
             // Update submit button
             document.getElementById('submit-btn').textContent = 'Update Record';
-            
+
             // Show cancel and delete buttons
             document.getElementById('cancel-btn').style.display = 'inline-block';
             document.getElementById('delete-btn').style.display = 'inline-block';
-            
+
             // Set operation mode
             document.getElementById('operation').value = 'edit';
             document.getElementById('record_id').value = recordId;
-            
-            // Populate form fields
+
+            // Populate form fields (student, instructor, year first)
             document.getElementById('student_id').value = recordData.student_id;
             document.getElementById('instructor_id').value = recordData.instructor_id;
-            document.getElementById('subject_id').value = recordData.subject_id;
             document.getElementById('school_year').value = recordData.school_year;
             document.getElementById('term').value = recordData.term;
             document.getElementById('grade').value = recordData.grade;
-            
+
+            // Update subject dropdown and set subject after AJAX
+            updateSubjectDropdown();
+            // Wait for the dropdown to be populated, then set the value
+            setTimeout(function() {
+                document.getElementById('subject_id').value = recordData.subject_id;
+            }, 400);
+
             // Scroll to form
             document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
         }
