@@ -1,5 +1,6 @@
 <?php
 require_once 'includes/db.php';
+require_once 'includes/queries.php';
 
 // Check if user is logged in and is admin
 if (session_status() === PHP_SESSION_NONE) {
@@ -10,149 +11,7 @@ if (!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
     header("Location: quickAccess.php");
     exit();
 }
-
-// Function to clean input data
-function cleanInput($data) {
-    return trim(htmlspecialchars($data));
-}
-
-// Function to delete a user
-function deleteUser($conn, $user_id) {
-    $conn->begin_transaction();
-    try {
-        // Delete from instructor and student tables first
-        $conn->prepare("DELETE FROM instructors WHERE instructor_id = ?")->execute([$user_id]);
-        $conn->prepare("DELETE FROM students WHERE student_id = ?")->execute([$user_id]);
-        
-        // Delete from users table
-        $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
-        $stmt->bind_param("i", $user_id);
-        
-        if ($stmt->execute() && $stmt->affected_rows > 0) {
-            $conn->commit();
-            return "User deleted successfully!";
-        } else {
-            $conn->rollback();
-            return "User not found or already deleted.";
-        }
-    } catch (Exception $e) {
-        $conn->rollback();
-        return "Error deleting user: " . $e->getMessage();
-    }
-}
-
-// Function to update a user
-function updateUser($conn, $user_id, $userData) {
-    $conn->begin_transaction();
-    try {
-        // Update user table
-        if (!empty($userData['password'])) {
-            $password_hash = password_hash($userData['password'], PASSWORD_DEFAULT);
-            $sql = "UPDATE users SET first_name=?, last_name=?, email=?, address=?, nationality=?, gender=?, contact_number=?, emergency_contact=?, permissions=?, password_hash=? WHERE user_id=?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssssssssssi", $userData['first_name'], $userData['last_name'], $userData['email'], $userData['address'], $userData['nationality'], $userData['gender'], $userData['contact_number'], $userData['emergency_contact'], $userData['permissions'], $password_hash, $user_id);
-        } else {
-            $sql = "UPDATE users SET first_name=?, last_name=?, email=?, address=?, nationality=?, gender=?, contact_number=?, emergency_contact=?, permissions=? WHERE user_id=?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssssssssi", $userData['first_name'], $userData['last_name'], $userData['email'], $userData['address'], $userData['nationality'], $userData['gender'], $userData['contact_number'], $userData['emergency_contact'], $userData['permissions'], $user_id);
-        }
-        
-        $stmt->execute();
-        $user_updated = $stmt->affected_rows > 0;
-        
-        // Handle role changes
-        $role_updated = false;
-        
-        // Handle instructor role
-        if ($userData['permissions'] === 'Instructor') {
-            $check = $conn->prepare("SELECT instructor_id FROM instructors WHERE instructor_id = ?");
-            $check->bind_param("i", $user_id);
-            $check->execute();
-            
-            if ($check->get_result()->num_rows > 0) {
-                // Update existing instructor
-                $update_inst = $conn->prepare("UPDATE instructors SET specialization = ? WHERE instructor_id = ?");
-                $update_inst->bind_param("si", $userData['specialization'], $user_id);
-                $role_updated = $update_inst->execute();
-            } else {
-                // Create new instructor
-                $insert_inst = $conn->prepare("INSERT INTO instructors (instructor_id, hire_date, employ_status, specialization) VALUES (?, CURRENT_DATE, 'Active', ?)");
-                $insert_inst->bind_param("is", $user_id, $userData['specialization']);
-                $role_updated = $insert_inst->execute();
-            }
-        } else {
-            // Delete instructor record if changing from instructor
-            $delete_inst = $conn->prepare("DELETE FROM instructors WHERE instructor_id = ?");
-            $delete_inst->bind_param("i", $user_id);
-            $delete_inst->execute();
-        }
-        
-        // Handle student role
-        if ($userData['permissions'] === 'Student') {
-            $check = $conn->prepare("SELECT student_id FROM students WHERE student_id = ?");
-            $check->bind_param("i", $user_id);
-            $check->execute();
-            
-            if ($check->get_result()->num_rows == 0) {
-                // Create new student
-                $insert_std = $conn->prepare("INSERT INTO students (student_id) VALUES (?)");
-                $insert_std->bind_param("i", $user_id);
-                $role_updated = $insert_std->execute();
-            }
-        } else {
-            // Delete student record if changing from student
-            $delete_std = $conn->prepare("DELETE FROM students WHERE student_id = ?");
-            $delete_std->bind_param("i", $user_id);
-            $delete_std->execute();
-        }
-        
-        if ($user_updated || $role_updated) {
-            $conn->commit();
-            return "User updated successfully!";
-        } else {
-            $conn->rollback();
-            return "No changes were made.";
-        }
-    } catch (Exception $e) {
-        $conn->rollback();
-        return "Error updating user: " . $e->getMessage();
-    }
-}
-
-// Function to add a new user
-function addUser($conn, $userData) {
-    $conn->begin_transaction();
-    try {
-        // Insert into users table
-        $password_hash = password_hash($userData['password'], PASSWORD_DEFAULT);
-        $sql = "INSERT INTO users (first_name, last_name, email, address, nationality, gender, contact_number, emergency_contact, permissions, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssssssss", $userData['first_name'], $userData['last_name'], $userData['email'], $userData['address'], $userData['nationality'], $userData['gender'], $userData['contact_number'], $userData['emergency_contact'], $userData['permissions'], $password_hash);
-        
-        if (!$stmt->execute()) {
-            throw new Exception("Error adding user");
-        }
-        
-        $user_id = $conn->insert_id;
-        
-        // Add to role-specific table
-        if ($userData['permissions'] === 'Instructor') {
-            $stmt2 = $conn->prepare("INSERT INTO instructors (instructor_id, hire_date, employ_status, specialization) VALUES (?, CURRENT_DATE, 'Active', ?)");
-            $stmt2->bind_param("is", $user_id, $userData['specialization']);
-            $stmt2->execute();
-        } elseif ($userData['permissions'] === 'Student') {
-            $stmt2 = $conn->prepare("INSERT INTO students (student_id) VALUES (?)");
-            $stmt2->bind_param("i", $user_id);
-            $stmt2->execute();
-        }
-        
-        $conn->commit();
-        return "User registered successfully!";
-    } catch (Exception $e) {
-        $conn->rollback();
-        return "Error: " . $e->getMessage();
-    }
-}
+// All database functions have been moved to queries.php
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -339,11 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </thead>
                     <tbody>
                         <?php
-                        $sql = "SELECT u.user_id, u.first_name, u.last_name, u.email, u.permissions, u.contact_number, u.gender, u.nationality, u.address, u.emergency_contact, i.specialization 
-                                FROM users u 
-                                LEFT JOIN instructors i ON u.user_id = i.instructor_id 
-                                ORDER BY u.permissions, u.first_name ASC";
-                        $result = $conn->query($sql);
+                        $result = getAllUsers($conn);
                         
                         if ($result && $result->num_rows > 0) {
                             while ($row = $result->fetch_assoc()) {
@@ -368,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 echo "</tr>";
                             }
                         } else {
-                            echo "<tr><td colspan='6' class='no-data'>No users found. Add your first user above!</td></tr>";
+                            echo "<tr><td colspan='4' class='no-data'>No users found. Add your first user above!</td></tr>";
                         }
                         ?>
                     </tbody>

@@ -11,6 +11,26 @@ if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
     exit();
 }
 
+// Handle AJAX request for getting class subjects
+if (isset($_GET['action']) && $_GET['action'] == 'get_subjects' && isset($_GET['class_id'])) {
+    $class_id = (int)$_GET['class_id'];
+    
+    $sql = "SELECT subject_id FROM class_subjects WHERE class_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $class_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $subjects = [];
+    while($row = $result->fetch_assoc()) {
+        $subjects[] = $row['subject_id'];
+    }
+    
+    header('Content-Type: application/json');
+    echo json_encode($subjects);
+    exit();
+}
+
 // Function to clean input data
 function cleanInput($data) {
     return trim(htmlspecialchars($data));
@@ -19,17 +39,35 @@ function cleanInput($data) {
 // Function to add a new class
 function addClass($conn, $classData) {
     try {
+        $conn->begin_transaction();
+
         // Insert into classes table
         $sql = "INSERT INTO classes (max_students, school_year, grade_level, room, section) VALUES (?, ?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("iiiss", $classData['max_students'], $classData['school_year'], $classData['grade_level'], $classData['room'], $classData['section']);
         
-        if ($stmt->execute()) {
-            return "Class added successfully!";
-        } else {
-            return "Error adding class: " . $stmt->error;
+        if (!$stmt->execute()) {
+            throw new Exception("Error adding class: " . $stmt->error);
         }
+        
+        $class_id = $conn->insert_id;
+        
+        // Insert subject associations
+        if (!empty($classData['subjects'])) {
+            $sql = "INSERT INTO class_subjects (class_id, subject_id) VALUES (?, ?)";
+            $stmt = $conn->prepare($sql);
+            foreach ($classData['subjects'] as $subject_id) {
+                $stmt->bind_param("ii", $class_id, $subject_id);
+                if (!$stmt->execute()) {
+                    throw new Exception("Error associating subject: " . $stmt->error);
+                }
+            }
+        }
+        
+        $conn->commit();
+        return "Class added successfully!";
     } catch (Exception $e) {
+        $conn->rollback();
         return "Error: " . $e->getMessage();
     }
 }
@@ -37,20 +75,40 @@ function addClass($conn, $classData) {
 // Function to update a class
 function updateClass($conn, $class_id, $classData) {
     try {
+        $conn->begin_transaction();
+
+        // Update classes table
         $sql = "UPDATE classes SET max_students = ?, school_year = ?, grade_level = ?, room = ?, section = ? WHERE class_id = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("iiissi", $classData['max_students'], $classData['school_year'], $classData['grade_level'], $classData['room'], $classData['section'], $class_id);
         
-        if ($stmt->execute()) {
-            if ($stmt->affected_rows > 0) {
-                return "Class updated successfully!";
-            } else {
-                return "No changes were made.";
-            }
-        } else {
-            return "Error updating class: " . $stmt->error;
+        if (!$stmt->execute()) {
+            throw new Exception("Error updating class: " . $stmt->error);
         }
+        
+        // Update subject associations
+        $sql = "DELETE FROM class_subjects WHERE class_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("i", $class_id);
+        if (!$stmt->execute()) {
+            throw new Exception("Error removing subject associations: " . $stmt->error);
+        }
+        
+        if (!empty($classData['subjects'])) {
+            $sql = "INSERT INTO class_subjects (class_id, subject_id) VALUES (?, ?)";
+            $stmt = $conn->prepare($sql);
+            foreach ($classData['subjects'] as $subject_id) {
+                $stmt->bind_param("ii", $class_id, $subject_id);
+                if (!$stmt->execute()) {
+                    throw new Exception("Error associating subject: " . $stmt->error);
+                }
+            }
+        }
+        
+        $conn->commit();
+        return "Class updated successfully!";
     } catch (Exception $e) {
+        $conn->rollback();
         return "Error: " . $e->getMessage();
     }
 }
@@ -69,6 +127,11 @@ function deleteClass($conn, $class_id) {
         $delete_schedules = $conn->prepare("DELETE FROM schedule WHERE class_id = ?");
         $delete_schedules->bind_param("i", $class_id);
         $delete_schedules->execute();
+        
+        // Delete subject associations
+        $delete_subjects = $conn->prepare("DELETE FROM class_subjects WHERE class_id = ?");
+        $delete_subjects->bind_param("i", $class_id);
+        $delete_subjects->execute();
         
         // Delete class
         $delete_class = $conn->prepare("DELETE FROM classes WHERE class_id = ?");
@@ -110,7 +173,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             'school_year' => (int)cleanInput($_POST['school_year']),
             'grade_level' => (int)cleanInput($_POST['grade_level']),
             'room' => cleanInput($_POST['room']),
-            'section' => cleanInput($_POST['section'])
+            'section' => cleanInput($_POST['section']),
+            'subjects' => isset($_POST['subjects']) ? array_map('intval', $_POST['subjects']) : []
         ];
         
         $result = updateClass($conn, $class_id, $classData);
@@ -135,7 +199,8 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 'school_year' => (int)cleanInput($_POST['school_year']),
                 'grade_level' => (int)cleanInput($_POST['grade_level']),
                 'room' => cleanInput($_POST['room']),
-                'section' => cleanInput($_POST['section'])
+                'section' => cleanInput($_POST['section']),
+                'subjects' => isset($_POST['subjects']) ? array_map('intval', $_POST['subjects']) : []
             ];
             
             $result = addClass($conn, $classData);
@@ -157,6 +222,36 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="css/adminLinks.css">
     <link rel="stylesheet" href="css/adminManagement.css">
+    <style>
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px;
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin: 0;
+        }
+        .checkbox-item label {
+            margin: 0;
+            font-size: 14px;
+            color: #333;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    </style>
 </head>
 <body>
     <div id="header-placeholder"></div>
@@ -212,6 +307,25 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <label class="form-label" for="school_year">School Year *</label>
                         <input class="form-input" name="school_year" id="school_year" type="number" min="2020" max="2030" placeholder="Enter school year (e.g., 2024)" required>
                     </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Subjects for this Class *</label>
+                        <div class="checkbox-group">
+                            <?php
+                            $sql = "SELECT subject_id, subject_name, grade_level FROM subjects ORDER BY grade_level, subject_name";
+                            $subjects = $conn->query($sql);
+                            
+                            if ($subjects->num_rows > 0) {
+                                while($subject = $subjects->fetch_assoc()) {
+                                    echo "<div class='checkbox-item'>";
+                                    echo "<input type='checkbox' name='subjects[]' id='subject" . $subject['subject_id'] . "' value='" . $subject['subject_id'] . "' data-grade='" . $subject['grade_level'] . "'>";
+                                    echo "<label for='subject" . $subject['subject_id'] . "'>" . htmlspecialchars($subject['subject_name']) . " (Grade " . $subject['grade_level'] . ")</label>";
+                                    echo "</div>";
+                                }
+                            }
+                            ?>
+                        </div>
+                    </div>
                 </div>
                 
                 <button type="submit" class="submit-btn" id="submit-btn">Add Class</button>
@@ -237,13 +351,18 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <th>Room</th>
                             <th>Students</th>
                             <th>School Year</th>
+                            <th>Subjects</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php
                         $sql = "SELECT c.class_id, c.grade_level, c.section, c.room, c.max_students, c.school_year,
-                                       (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.class_id) as current_students
+                                       (SELECT COUNT(*) FROM enrollments e WHERE e.class_id = c.class_id) as current_students,
+                                       GROUP_CONCAT(s.subject_name ORDER BY s.subject_name SEPARATOR ', ') as subjects
                                 FROM classes c 
+                                LEFT JOIN class_subjects cs ON c.class_id = cs.class_id
+                                LEFT JOIN subjects s ON cs.subject_id = s.subject_id
+                                GROUP BY c.class_id
                                 ORDER BY c.grade_level, c.section";
                         $result = $conn->query($sql);
                         
@@ -262,10 +381,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 echo "<td>" . htmlspecialchars($row['room']) . "</td>";
                                 echo "<td>" . $row['current_students'] . "/" . $row['max_students'] . "</td>";
                                 echo "<td>" . htmlspecialchars($row['school_year']) . "</td>";
+                                echo "<td>" . htmlspecialchars($row['subjects'] ?: 'No subjects assigned') . "</td>";
                                 echo "</tr>";
                             }
                         } else {
-                            echo "<tr><td colspan='5' class='no-data'>No classes found. Add your first class above!</td></tr>";
+                            echo "<tr><td colspan='6' class='no-data'>No classes found. Add your first class above!</td></tr>";
                         }
                         ?>
                     </tbody>
@@ -298,6 +418,21 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             document.getElementById('section').value = classData.section;
             document.getElementById('room').value = classData.room;
             document.getElementById('max_students').value = classData.max_students;
+            
+            // Load subjects for this class
+            fetch('adminClasses.php?action=get_subjects&class_id=' + classId)
+                .then(response => response.json())
+                .then(subjects => {
+                    // Clear all checkboxes first
+                    document.querySelectorAll('input[name="subjects[]"]').forEach(checkbox => checkbox.checked = false);
+                    
+                    // Check the ones assigned to this class
+                    subjects.forEach(subjectId => {
+                        const checkbox = document.getElementById('subject' + subjectId);
+                        if (checkbox) checkbox.checked = true;
+                    });
+                })
+                .catch(error => console.error('Error loading subjects:', error));
             document.getElementById('school_year').value = classData.school_year;
             
             // Scroll to form
@@ -328,6 +463,27 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
         
+        // Function to filter subjects based on selected grade level
+        function filterSubjectsByGrade(gradeLevel) {
+            document.querySelectorAll('.checkbox-item').forEach(item => {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                const subjectGrade = checkbox.getAttribute('data-grade');
+                if (subjectGrade == gradeLevel) {
+                    item.style.display = '';
+                    checkbox.disabled = false;
+                } else {
+                    item.style.display = 'none';
+                    checkbox.disabled = true;
+                    checkbox.checked = false;
+                }
+            });
+        }
+        
+        // Handle grade level change
+        document.getElementById('grade_level').addEventListener('change', function() {
+            filterSubjectsByGrade(this.value);
+        });
+
         // Search functionality
         document.getElementById('searchBar').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
