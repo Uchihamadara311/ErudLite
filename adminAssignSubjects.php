@@ -1,26 +1,41 @@
 <?php 
 require_once 'includes/db.php';
+session_start();
 
-// Check if user is logged in and is admin
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+// Function to get all instructors for subject assignments
+function getAllInstructorsForSubject($conn) {
+    $sql = "SELECT 
+                i.Instructor_ID,
+                pb.Given_Name,
+                pb.Last_Name,
+                i.Specialization
+            FROM Instructor i
+            JOIN Profile p ON p.Profile_ID = i.Profile_ID
+            JOIN Profile_Bio pb ON pb.Profile_ID = p.Profile_ID
+            ORDER BY pb.Given_Name, pb.Last_Name";
+    return $conn->query($sql);
 }
 
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+// Function to get all subjects with grade levels
+function getAllSubjectsWithGrade($conn) {
+    $sql = "SELECT s.Subject_ID, s.Subject_Name, COALESCE(c.Grade_Level, 'N/A') as Grade_Level
+            FROM Subject s
+            JOIN Clearance c ON s.Clearance_ID = c.Clearance_ID
+            ORDER BY c.Grade_Level, s.Subject_Name";
+    return $conn->query($sql);
+}
+
+// Ensure user is logged in and has admin permissions
+if (!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
     header("Location: quickAccess.php");
     exit();
-}
-
-// Function to clean input data
-function cleanInput($data) {
-    return trim(htmlspecialchars($data));
 }
 
 // Function to assign subject to instructor
 function assignSubject($conn, $instructor_id, $subject_id) {
     try {
         // Check if assignment already exists
-        $check_sql = "SELECT * FROM assigned_subject WHERE instructor_id = ? AND subject_id = ?";
+        $check_sql = "SELECT * FROM Assigned_Subject WHERE Instructor_ID = ? AND Subject_ID = ?";
         $check_stmt = $conn->prepare($check_sql);
         $check_stmt->bind_param("ii", $instructor_id, $subject_id);
         $check_stmt->execute();
@@ -30,7 +45,7 @@ function assignSubject($conn, $instructor_id, $subject_id) {
         }
         
         // Insert new assignment
-        $sql = "INSERT INTO assigned_subject (instructor_id, subject_id) VALUES (?, ?)";
+        $sql = "INSERT INTO Assigned_Subject (Instructor_ID, Subject_ID) VALUES (?, ?)";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ii", $instructor_id, $subject_id);
         
@@ -47,7 +62,7 @@ function assignSubject($conn, $instructor_id, $subject_id) {
 // Function to unassign subject from instructor
 function unassignSubject($conn, $instructor_id, $subject_id) {
     try {
-        $sql = "DELETE FROM assigned_subject WHERE instructor_id = ? AND subject_id = ?";
+        $sql = "DELETE FROM Assigned_Subject WHERE Instructor_ID = ? AND Subject_ID = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ii", $instructor_id, $subject_id);
         
@@ -71,19 +86,21 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $instructor_id = (int)($_POST['instructor_id'] ?? 0);
     $subject_id = (int)($_POST['subject_id'] ?? 0);
     
-    if ($operation == 'assign' && $instructor_id > 0 && $subject_id > 0) {
-        $result = assignSubject($conn, $instructor_id, $subject_id);
-        if (strpos($result, 'successfully') !== false) {
-            $success_message = $result;
-        } else {
-            $error_message = $result;
-        }
-    } elseif ($operation == 'unassign' && $instructor_id > 0 && $subject_id > 0) {
-        $result = unassignSubject($conn, $instructor_id, $subject_id);
-        if (strpos($result, 'successfully') !== false) {
-            $success_message = $result;
-        } else {
-            $error_message = $result;
+    if ($instructor_id > 0 && $subject_id > 0) {
+        if ($operation == 'assign') {
+            $result = assignSubject($conn, $instructor_id, $subject_id);
+            if (strpos($result, 'successfully') !== false) {
+                $success_message = $result;
+            } else {
+                $error_message = $result;
+            }
+        } elseif ($operation == 'unassign') {
+            $result = unassignSubject($conn, $instructor_id, $subject_id);
+            if (strpos($result, 'successfully') !== false) {
+                $success_message = $result;
+            } else {
+                $error_message = $result;
+            }
         }
     } else {
         $error_message = "Please select both instructor and subject.";
@@ -127,18 +144,12 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <select class="form-select" name="instructor_id" id="instructor_id" required>
                             <option value="">Select an Instructor</option>
                             <?php
-                            $instructor_sql = "SELECT u.user_id, u.first_name, u.last_name, i.specialization 
-                                             FROM users u 
-                                             JOIN instructors i ON u.user_id = i.instructor_id 
-                                             WHERE u.permissions = 'Instructor' 
-                                             ORDER BY u.first_name, u.last_name";
-                            $instructor_result = $conn->query($instructor_sql);
-                            
-                            if ($instructor_result->num_rows > 0) {
+                            $instructor_result = getAllInstructorsForSubject($conn);
+                            if ($instructor_result && $instructor_result->num_rows > 0) {
                                 while($instructor = $instructor_result->fetch_assoc()) {
-                                    echo "<option value='" . $instructor['user_id'] . "'>" . 
-                                         htmlspecialchars($instructor['first_name'] . ' ' . $instructor['last_name']) . 
-                                         " (" . htmlspecialchars($instructor['specialization']) . ")</option>";
+                                    echo "<option value='" . $instructor['Instructor_ID'] . "'>" . 
+                                         htmlspecialchars($instructor['Given_Name'] . ' ' . $instructor['Last_Name']) . 
+                                         " (" . htmlspecialchars($instructor['Specialization']) . ")</option>";
                                 }
                             }
                             ?>
@@ -150,13 +161,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <select class="form-select" name="subject_id" id="subject_id" required>
                             <option value="">Select a Subject</option>
                             <?php
-                            $subject_sql = "SELECT subject_id, subject_name, grade_level FROM subjects ORDER BY grade_level, subject_name";
-                            $subject_result = $conn->query($subject_sql);
-                            
-                            if ($subject_result->num_rows > 0) {
+                            $subject_result = getAllSubjectsWithGrade($conn);
+                            if ($subject_result && $subject_result->num_rows > 0) {
                                 while($subject = $subject_result->fetch_assoc()) {
-                                    echo "<option value='" . $subject['subject_id'] . "'>" . 
-                                         htmlspecialchars($subject['subject_name']) . " (Grade " . $subject['grade_level'] . ")</option>";
+                                    echo "<option value='" . $subject['Subject_ID'] . "'>" . 
+                                         htmlspecialchars($subject['Subject_Name']) . " (Grade " . $subject['Grade_Level'] . ")</option>";
                                 }
                             }
                             ?>
@@ -164,56 +173,76 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                 </div>
                 
-                <button type="submit" class="submit-btn" id="submit-btn">Assign Subject</button>
-                <button type="button" class="cancel-btn" id="cancel-btn" style="display: none; margin-left: 10px;" onclick="resetForm()">Cancel</button>
-                <button type="button" class="delete-btn" id="delete-btn" style="display: none; margin-left: 10px;" onclick="unassignSubject()">Unassign Subject</button>
+                <div class="button-group">
+                    <button type="submit" class="submit-btn" id="submit-btn"><i class="fas fa-plus-circle"></i> Assign Subject</button>
+                    <button type="button" class="cancel-btn" id="cancel-btn" style="display: none;" onclick="resetForm()"><i class="fas fa-times-circle"></i> Cancel</button>
+                    <button type="button" class="delete-btn" id="delete-btn" style="display: none;" onclick="unassignSubject()"><i class="fas fa-minus-circle"></i> Unassign Subject</button>
+                </div>
             </form>
         </section>
         
         <section class="table-section">
-            <div class="table-header">
-                <span>Current Subject Assignments</span>
-                <div class="search-container" style="width: 70%">
-                    <input type="text" id="searchBar" class="form-input" placeholder="Search assignments..." style="width: 50%; margin-bottom: 10px;">
+            <div class="section-header">
+                <div class="header-icon-title">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <h2>Current Subject Assignments</h2>
+                </div>
+                <div class="search-wrapper">
                     <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchBar" class="search-input" placeholder="Search assignments...">
                 </div>
             </div>
             <div class="table-container">
-                <table class="subjects-table" id="assignments-table">
+                <table class="data-table" id="assignments-table">
                     <thead>
                         <tr>
-                            <th>Instructor Name</th>
-                            <th>Subject Name</th>
-                            <th>Grade Level</th>
-                            <th>Specialization</th>
+                            <th><i class="fas fa-user"></i> Instructor Name</th>
+                            <th><i class="fas fa-book"></i> Subject Name</th>
+                            <th><i class="fas fa-graduation-cap"></i> Grade Level</th>
+                            <th><i class="fas fa-briefcase"></i> Specialization</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php
-                        $sql = "SELECT a.instructor_id, a.subject_id, 
-                                       u.first_name, u.last_name, 
-                                       s.subject_name, s.grade_level,
-                                       i.specialization
-                                FROM assigned_subject a 
-                                JOIN users u ON a.instructor_id = u.user_id 
-                                JOIN subjects s ON a.subject_id = s.subject_id
-                                JOIN instructors i ON a.instructor_id = i.instructor_id
-                                ORDER BY u.first_name, u.last_name, s.grade_level, s.subject_name";
+                        $sql = "SELECT 
+                                       a.Instructor_ID, 
+                                       a.Subject_ID,
+                                       pb.Given_Name,
+                                       pb.Last_Name,
+                                       s.Subject_Name,
+                                       COALESCE(c.Grade_Level, 'N/A') as Grade_Level,
+                                       i.Specialization
+                                FROM Assigned_Subject a 
+                                JOIN Instructor i ON a.Instructor_ID = i.Instructor_ID
+                                JOIN Profile p ON i.Profile_ID = p.Profile_ID
+                                JOIN Profile_Bio pb ON pb.Profile_ID = p.Profile_ID
+                                JOIN Subject s ON a.Subject_ID = s.Subject_ID
+                                LEFT JOIN Clearance c ON s.Clearance_ID = c.Clearance_ID
+                                ORDER BY s.Subject_Name, pb.Given_Name, pb.Last_Name, c.Grade_Level";
                         $result = $conn->query($sql);
                         
                         if ($result && $result->num_rows > 0) {
                             while($row = $result->fetch_assoc()) {
+                                $gradeLevel = htmlspecialchars($row['Grade_Level']);
+                                $instructorName = htmlspecialchars($row['Given_Name'] . ' ' . $row['Last_Name']);
+                                $subjectName = htmlspecialchars($row['Subject_Name']);
+                                $specialization = htmlspecialchars($row['Specialization']);
+
                                 echo "<tr class='clickable-row' onclick='editAssignment(" . 
-                                     $row['instructor_id'] . ", " . $row['subject_id'] . ", {" .
-                                     "instructor_name: \"" . htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) . "\", " .
-                                     "subject_name: \"" . htmlspecialchars($row['subject_name']) . "\", " .
-                                     "grade_level: " . $row['grade_level'] . ", " .
-                                     "specialization: \"" . htmlspecialchars($row['specialization']) . "\"" .
+                                     $row['Instructor_ID'] . ", " . $row['Subject_ID'] . ", {" .
+                                     "instructor_name: \"" . $instructorName . "\", " .
+                                     "subject_name: \"" . $subjectName . "\", " .
+                                     "grade_level: " . ($gradeLevel ?: 'null') . ", " .
+                                     "specialization: \"" . $specialization . "\"" .
                                      "})'>";
-                                echo "<td>" . htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) . "</td>";
-                                echo "<td>" . htmlspecialchars($row['subject_name']) . "</td>";
-                                echo "<td><span class='grade-badge'>Grade " . htmlspecialchars($row['grade_level']) . "</span></td>";
-                                echo "<td>" . htmlspecialchars($row['specialization']) . "</td>";
+                                echo "<td>" . $instructorName . "</td>";
+                                echo "<td>" . $subjectName . "</td>";
+                                if ($gradeLevel && $gradeLevel !== 'N/A') {
+                                    echo "<td><span class='grade-badge grade-level-{$gradeLevel}'>Grade {$gradeLevel}</span></td>";
+                                } else {
+                                    echo "<td><span class='grade-badge grade-level-none'>N/A</span></td>";
+                                }
+                                echo "<td>" . $specialization . "</td>";
                                 echo "</tr>";
                             }
                         } else {
@@ -265,7 +294,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             document.getElementById('instructor_id').disabled = false;
             document.getElementById('subject_id').disabled = false;
             document.getElementById('assignment-form').reset();
-            document.getElementById('operation').value = 'assign';
         }
         
         // Function to unassign subject

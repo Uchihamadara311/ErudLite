@@ -47,6 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.backgroundColor = '';
         });
     });
+    
+    // Initialize form state
+    handleRoleChange();
 });
 
 function initializeAutocomplete() {
@@ -269,10 +272,10 @@ function editUser(userId, userData) {
     if (!document.getElementById('email')) return;
     
     // Update form title
-    document.getElementById('form-title').textContent = 'Edit User: ' + userData.name;
+    document.getElementById('form-title').innerHTML = '<i class="fas fa-user-edit"></i> Edit User: ' + userData.name;
     
     // Update submit button
-    document.getElementById('submit-btn').textContent = 'Update User';
+    document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update User';
     
     // Show cancel and delete buttons
     document.getElementById('cancel-btn').style.display = 'inline-block';
@@ -332,8 +335,8 @@ function resetForm() {
         document.getElementById('operation').value = 'add';
         document.getElementById('subject_id').value = '';
     } else if (isUser) {
-        document.getElementById('form-title').textContent = 'Add New User';
-        document.getElementById('submit-btn').textContent = 'Register User';
+        document.getElementById('form-title').innerHTML = '<i class="fas fa-user-plus"></i> Add New User';
+        document.getElementById('submit-btn').innerHTML = '<i class="fas fa-plus"></i> Add User';
         document.getElementById('operation').value = 'add';
         document.getElementById('user_id').value = '';
         
@@ -425,8 +428,8 @@ function handleRoleChange() {
     const instructorFields = document.getElementById('instructorFields');
     const specializationField = document.getElementById('specialization');
     
-    if (roleSelect && instructorFields && specializationField) {
-        if (roleSelect.value === 'Instructor') {
+    if (instructorFields && specializationField) {
+        if (roleSelect && roleSelect.value === 'Instructor') {
             instructorFields.classList.remove('hidden');
             specializationField.required = true;
         } else {
@@ -458,4 +461,7 @@ function cancelEdit() {
     if (instructorFields) {
         instructorFields.classList.add('hidden');
     }
+    
+    // Ensure proper role state after reset
+    handleRoleChange();
 }

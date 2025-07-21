@@ -1,4 +1,5 @@
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
+    // Search functionality
     const searchBar = document.getElementById('searchBar');
     if (searchBar) {
         searchBar.addEventListener('keyup', function() {
@@ -11,9 +12,98 @@
         });
     }
     
-    // Initialize autocomplete for subject name
+    // Initialize autocomplete
     initializeAutocomplete();
+    
+    // Add hover effects to rows
+    const rows = document.querySelectorAll('.clickable-row');
+    rows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            if (!this.classList.contains('selected')) {
+                this.style.backgroundColor = '#f8f9fa';
+            }
+        });
+        row.addEventListener('mouseleave', function() {
+            if (!this.classList.contains('selected')) {
+                this.style.backgroundColor = '';
+            }
+        });
+    });
 });
+
+function editSubject(subject_id, data) {
+    // Remove selected class from all rows
+    document.querySelectorAll('.clickable-row').forEach(row => row.classList.remove('selected'));
+    
+    // Add selected class to clicked row
+    event.currentTarget.classList.add('selected');
+    
+    // Update form values
+    document.getElementById('operation').value = 'edit';
+    document.getElementById('subject_id').value = subject_id;
+    document.getElementById('subject_name').value = data.subject_name;
+    document.getElementById('description').value = data.description || '';
+    document.getElementById('grade_level').value = data.grade_level || '';
+    
+    // Update form title and buttons
+    document.getElementById('form-title').innerHTML = '<i class="fas fa-edit"></i> Edit Subject';
+    document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update Subject';
+    document.getElementById('cancel-btn').style.display = 'inline-block';
+    document.getElementById('delete-btn').style.display = 'inline-block';
+    
+    // Smooth scroll to form with offset
+    const formSection = document.querySelector('.form-section');
+    const header = document.querySelector('#header-placeholder');
+    const headerHeight = header ? header.offsetHeight : 0;
+    const offset = headerHeight + 20;
+    
+    window.scrollTo({
+        top: formSection.offsetTop - offset,
+        behavior: 'smooth'
+    });
+}
+
+function resetForm() {
+    // Reset form values
+    document.getElementById('operation').value = 'add';
+    document.getElementById('subject_id').value = '';
+    document.getElementById('subject_name').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('grade_level').value = '';
+    
+    // Reset form appearance
+    document.getElementById('form-title').innerHTML = '<i class="fas fa-book-open"></i> Add New Subject';
+    document.getElementById('submit-btn').innerHTML = '<i class="fas fa-plus"></i> Add Subject';
+    document.getElementById('cancel-btn').style.display = 'none';
+    document.getElementById('delete-btn').style.display = 'none';
+    
+    // Remove selected state from all rows
+    document.querySelectorAll('.clickable-row').forEach(row => {
+        row.classList.remove('selected');
+        row.style.backgroundColor = '';
+    });
+}
+
+function deleteSubject(subject_id) {
+    event.stopPropagation(); // Prevent row click event
+    
+    if (confirm('Are you sure you want to delete this subject? This action cannot be undone.')) {
+        document.getElementById('operation').value = 'delete';
+        document.getElementById('subject_id').value = subject_id;
+        document.getElementById('subject-form').submit();
+    }
+}
+
+function deleteCurrentSubject() {
+    const subjectId = document.getElementById('subject_id').value;
+    
+    if (!subjectId) {
+        console.error('No subject selected for deletion');
+        return;
+    }
+    
+    deleteSubject(subjectId);
+}
 
 function initializeAutocomplete() {
     const subjectNameInput = document.getElementById('subject_name');
@@ -21,250 +111,46 @@ function initializeAutocomplete() {
     
     if (!subjectNameInput || !suggestionsDiv) return;
     
-    // Get existing subjects from the table
-    function getExistingSubjects() {
-        const subjects = [];
-        const rows = document.querySelectorAll("#subjects-table tbody tr.clickable-row");
-        
-        rows.forEach(function(row) {
-            const cells = row.querySelectorAll('td');
-            if (cells.length >= 4) {
-                // Get the onclick attribute to extract subject_id
-                const onclickAttr = row.getAttribute('onclick');
-                const subjectIdMatch = onclickAttr.match(/editSubject\((\d+)/);
-                const subjectId = subjectIdMatch ? parseInt(subjectIdMatch[1]) : 0;
-                
-                subjects.push({
-                    id: subjectId,
-                    name: cells[0].textContent.trim(),
-                    description: cells[1].textContent.trim(),
-                    grade: cells[2].textContent.trim(),
-                    requirements: cells[3].textContent.trim()
-                });
-            }
-        });
-        
-        return subjects;
-    }
-    
-    // Filter subjects based on input
-    function filterSubjects(input) {
-        const subjects = getExistingSubjects();
-        const query = input.toLowerCase();
-        
-        return subjects.filter(subject => 
-            subject.name.toLowerCase().includes(query)
-        );
-    }
-    
-    // Show suggestions
-    function showSuggestions(suggestions) {
-        if (suggestions.length === 0) {
+    subjectNameInput.addEventListener('input', function() {
+        const filter = this.value.toLowerCase();
+        if (filter.length < 2) {
             suggestionsDiv.style.display = 'none';
             return;
         }
         
-        suggestionsDiv.innerHTML = '';
-        
-        suggestions.forEach(function(subject) {
-            const suggestionDiv = document.createElement('div');
-            suggestionDiv.className = 'autocomplete-suggestion';
+        const rows = document.querySelectorAll("#subjects-table tbody tr");
+        const suggestions = Array.from(rows)
+            .map(row => ({
+                id: row.getAttribute('data-id'),
+                name: row.cells[0].textContent.trim(),
+                description: row.cells[1].textContent.trim()
+            }))
+            .filter(subject => subject.name.toLowerCase().includes(filter));
             
-            // Only show subject name and grade
-            suggestionDiv.innerHTML = `
-                <span class="subject-name">${subject.name}</span>
-                <span class="subject-grade">${subject.grade}</span>
-            `;
-            
-            suggestionDiv.addEventListener('click', function() {
-                // Extract grade level number from the grade text (e.g., "Grade 3" -> 3)
-                const gradeMatch = subject.grade.match(/Grade (\d+)/);
-                const gradeLevel = gradeMatch ? parseInt(gradeMatch[1]) : 0;
-                
-                // Switch to edit mode and populate the form
-                editSubject(
-                    subject.id,
-                    subject.name,
-                    subject.description === 'No description' ? '' : subject.description,
-                    gradeLevel,
-                    subject.requirements === 'No requirements' ? '' : subject.requirements
-                );
-                
-                suggestionsDiv.style.display = 'none';
-            });
-            
-            suggestionsDiv.appendChild(suggestionDiv);
-        });
-        
-        suggestionsDiv.style.display = 'block';
+        showSuggestions(suggestions);
+    });
+}
+
+function showSuggestions(suggestions) {
+    const suggestionsDiv = document.getElementById('subject-suggestions');
+    if (!suggestionsDiv) return;
+    
+    if (suggestions.length === 0) {
+        suggestionsDiv.style.display = 'none';
+        return;
     }
     
-    // Hide suggestions
-    function hideSuggestions() {
-        setTimeout(() => {
+    suggestionsDiv.innerHTML = '';
+    suggestions.forEach(subject => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.innerHTML = `<i class="fas fa-book"></i> ${subject.name}`;
+        div.addEventListener('click', () => {
+            document.getElementById('subject_name').value = subject.name;
             suggestionsDiv.style.display = 'none';
-        }, 200);
-    }
-    
-    // Event listeners
-    subjectNameInput.addEventListener('input', function() {
-        const value = this.value.trim();
-        
-        if (value.length >= 1) {
-            const suggestions = filterSubjects(value);
-            showSuggestions(suggestions);
-        } else {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-    
-    subjectNameInput.addEventListener('focus', function() {
-        const value = this.value.trim();
-        if (value.length >= 1) {
-            const suggestions = filterSubjects(value);
-            showSuggestions(suggestions);
-        }
-    });
-    
-    subjectNameInput.addEventListener('blur', hideSuggestions);
-    
-    // Handle keyboard navigation
-    subjectNameInput.addEventListener('keydown', function(e) {
-        const suggestions = suggestionsDiv.querySelectorAll('.autocomplete-suggestion');
-        const activeSuggestion = suggestionsDiv.querySelector('.autocomplete-suggestion.active');
-        
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (activeSuggestion) {
-                activeSuggestion.classList.remove('active');
-                const next = activeSuggestion.nextElementSibling;
-                if (next) {
-                    next.classList.add('active');
-                } else {
-                    suggestions[0].classList.add('active');
-                }
-            } else if (suggestions.length > 0) {
-                suggestions[0].classList.add('active');
-            }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (activeSuggestion) {
-                activeSuggestion.classList.remove('active');
-                const prev = activeSuggestion.previousElementSibling;
-                if (prev) {
-                    prev.classList.add('active');
-                } else {
-                    suggestions[suggestions.length - 1].classList.add('active');
-                }
-            } else if (suggestions.length > 0) {
-                suggestions[suggestions.length - 1].classList.add('active');
-            }
-        } else if (e.key === 'Enter') {
-            if (activeSuggestion) {
-                e.preventDefault();
-                activeSuggestion.click();
-            }
-        } else if (e.key === 'Escape') {
-            suggestionsDiv.style.display = 'none';
-        }
-    });
-}
-
-
-function editSubject(subjectId, subjectName, description, gradeLevel, requirements) {
-    // Update form title to show the current subject name
-    document.getElementById('form-title').textContent = 'Edit Subject: ' + subjectName;
-
-    // Update submit button
-    document.getElementById('submit-btn').textContent = 'Update Subject';
-
-    // Show cancel and delete buttons
-    document.getElementById('cancel-btn').style.display = 'inline-block';
-    document.getElementById('delete-btn').style.display = 'inline-block';
-
-    // Set operation mode to edit
-    document.getElementById('operation').value = 'edit';
-    document.getElementById('subject_id').value = subjectId;
-
-    // Populate form fields
-    document.getElementById('subject_name').value = subjectName;
-    document.getElementById('description').value = description || '';
-    document.getElementById('grade_level').value = gradeLevel;
-    document.getElementById('requirements').value = requirements || '';
-
-    // Scroll to form
-    document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-function resetForm() {
-    // Reset form title
-    document.getElementById('form-title').textContent = 'Add New Subject';
-
-    // Reset submit button
-    document.getElementById('submit-btn').textContent = 'Add Subject';
-
-    // Hide cancel and delete buttons
-    document.getElementById('cancel-btn').style.display = 'none';
-    document.getElementById('delete-btn').style.display = 'none';
-
-    // Reset operation mode to add
-    document.getElementById('operation').value = 'add';
-    document.getElementById('subject_id').value = '';
-
-    // Clear form fields
-    document.getElementById('subject-form').reset();
-
-    // Re-set the hidden fields after reset (since reset clears them)
-    document.getElementById('operation').value = 'add';
-    document.getElementById('subject_id').value = '';
-}
-
-function deleteCurrentSubject() {
-    const subjectId = document.getElementById('subject_id').value;
-    const subjectName = document.getElementById('subject_name').value;
-    
-    if (subjectId && subjectName) {
-        deleteSubject(subjectId, subjectName);
-    }
-}
-
-function deleteSubject(subjectId, subjectName) {
-    if (confirm('Are you sure you want to delete the subject "' + subjectName + '"? This action cannot be undone.')) {
-        // Create a form to submit the delete request
-        const deleteForm = document.createElement('form');
-        deleteForm.method = 'POST';
-        deleteForm.action = 'adminSubjectManagement.php';
-        deleteForm.style.display = 'none';
-        
-        // Add hidden fields
-        const operationInput = document.createElement('input');
-        operationInput.type = 'hidden';
-        operationInput.name = 'operation';
-        operationInput.value = 'delete';
-        deleteForm.appendChild(operationInput);
-        
-        const subjectIdInput = document.createElement('input');
-        subjectIdInput.type = 'hidden';
-        subjectIdInput.name = 'subject_id';
-        subjectIdInput.value = subjectId;
-        deleteForm.appendChild(subjectIdInput);
-        
-        // Add form to document and submit
-        document.body.appendChild(deleteForm);
-        deleteForm.submit();
-    }
-}
-
-// Add hover effect for clickable rows
-document.addEventListener('DOMContentLoaded', function() {
-    const rows = document.querySelectorAll('.clickable-row');
-    rows.forEach(row => {
-        row.addEventListener('mouseenter', function() {
-            this.style.backgroundColor = '#f8f9fa';
-            this.style.cursor = 'pointer';
         });
-        row.addEventListener('mouseleave', function() {
-            this.style.backgroundColor = '';
-        });
+        suggestionsDiv.appendChild(div);
     });
-});
+    
+    suggestionsDiv.style.display = 'block';
+}

@@ -1,3 +1,16 @@
+<?php
+require_once 'includes/db.php';
+
+// Ensure user is logged in and has admin permissions
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: quickAccess.php");
+    exit();
+}
+
+
+
+
+?>
 <html lang="en">
 <head>
     <meta charset="UTF-8">

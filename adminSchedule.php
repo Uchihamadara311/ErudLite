@@ -1,62 +1,7 @@
-<?php 
+<?php
 require_once 'includes/db.php';
-
-// Check if user is logged in and is admin
-if (session_status() === PHP_SESSION_NONE) {
+if (session_status() == PHP_SESSION_NONE) {
     session_start();
-}
-
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
-    exit();
-}
-
-// Handle AJAX request for getting subjects by instructor
-if (isset($_GET['action']) && $_GET['action'] == 'get_subjects' && isset($_GET['instructor_id'])) {
-    $instructor_id = (int)$_GET['instructor_id'];
-    
-    $subject_sql = "SELECT s.subject_id, s.subject_name, s.grade_level 
-                    FROM subjects s 
-                    JOIN assigned_subject a ON s.subject_id = a.subject_id 
-                    WHERE a.instructor_id = ? 
-                    ORDER BY s.grade_level, s.subject_name";
-    $subject_stmt = $conn->prepare($subject_sql);
-    $subject_stmt->bind_param("i", $instructor_id);
-    $subject_stmt->execute();
-    $subject_result = $subject_stmt->get_result();
-    
-    $subjects = [];
-    while($subject = $subject_result->fetch_assoc()) {
-        $subjects[] = $subject;
-    }
-    
-    header('Content-Type: application/json');
-    echo json_encode($subjects);
-    exit();
-}
-
-// Handle AJAX request for getting classes by subject grade level
-if (isset($_GET['action']) && $_GET['action'] == 'get_classes' && isset($_GET['subject_id'])) {
-    $subject_id = (int)$_GET['subject_id'];
-    
-    $class_sql = "SELECT c.class_id, c.grade_level, c.section, c.room 
-                  FROM classes c 
-                  JOIN subjects s ON c.grade_level = s.grade_level 
-                  WHERE s.subject_id = ? 
-                  ORDER BY c.grade_level, c.section";
-    $class_stmt = $conn->prepare($class_sql);
-    $class_stmt->bind_param("i", $subject_id);
-    $class_stmt->execute();
-    $class_result = $class_stmt->get_result();
-    
-    $classes = [];
-    while($class = $class_result->fetch_assoc()) {
-        $classes[] = $class;
-    }
-    
-    header('Content-Type: application/json');
-    echo json_encode($classes);
-    exit();
 }
 
 // Function to clean input data
@@ -64,207 +9,203 @@ function cleanInput($data) {
     return trim(htmlspecialchars($data));
 }
 
-// Function to add a new schedule
-function addSchedule($conn, $scheduleData) {
+// Ensure user is logged in and has admin permissions
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: quickAccess.php");
+    exit();
+}
+
+// Initialize messages
+$success_message = '';
+$error_message = '';
+
+// Handle form submission for adding/updating/deleting schedules
+if($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $operation = isset($_POST['operation']) ? $_POST['operation'] : 'add_schedule';
+    $redirect_year = isset($_GET['year']) ? $_GET['year'] : date('Y') . '-' . (date('Y') + 1);
+
+    $conn->begin_transaction();
+
     try {
-        $conn->begin_transaction();
-        $days = is_array($scheduleData['days']) ? $scheduleData['days'] : [$scheduleData['days']];
-        $conflicts = [];
-        
-        // Check for conflicts on all selected days (instructor cannot have overlapping times across all classes/grade levels)
-        foreach ($days as $day) {
-            $conflict_sql = "SELECT s.schedule_id, s.time, s.day, c.room, u.first_name, u.last_name 
-                            FROM schedule s 
-                            JOIN classes c ON s.class_id = c.class_id 
-                            JOIN users u ON s.instructor_id = u.user_id 
-                            WHERE s.time = ? AND s.day = ? AND (s.instructor_id = ? OR c.room = (SELECT room FROM classes WHERE class_id = ?))";
-            $conflict_stmt = $conn->prepare($conflict_sql);
-            $conflict_stmt->bind_param("ssii", $scheduleData['time'], $day, $scheduleData['instructor_id'], $scheduleData['class_id']);
-            $conflict_stmt->execute();
-            $result = $conflict_stmt->get_result();
-            if ($result->num_rows > 0) {
-                // Check if any conflict is for the same instructor (regardless of class/grade)
-                while ($row = $result->fetch_assoc()) {
-                    if ($row['instructor_id'] == $scheduleData['instructor_id']) {
-                        $conflicts[] = ucfirst(strtolower($day));
-                        break;
+        if ($operation == 'add_schedule' || $operation == 'update_schedule') {
+            $instructor_id = (int)$_POST['instructor_id'];
+            $subject_id = (int)$_POST['subject_id'];
+            $class_id = (int)$_POST['class_id'];
+            $selected_days = isset($_POST['days']) ? $_POST['days'] : [];
+            $start_time = cleanInput($_POST['start_time']);
+            $end_time = cleanInput($_POST['end_time']);
+            
+            // For updates, we need the original keys to find the record
+            $original_schedule_id = isset($_POST['original_schedule_id']) ? (int)$_POST['original_schedule_id'] : 0;
+            $original_day = isset($_POST['original_day']) ? cleanInput($_POST['original_day']) : '';
+            $original_start_time = isset($_POST['original_start_time']) ? cleanInput($_POST['original_start_time']) : '';
+            $original_end_time = isset($_POST['original_end_time']) ? cleanInput($_POST['original_end_time']) : '';
+
+            if (empty($instructor_id) || empty($subject_id) || empty($class_id) || empty($selected_days) || empty($start_time) || empty($end_time)) {
+                throw new Exception("All fields are required, including at least one day.");
+            }
+
+            // Validate that end time is after start time
+            if (strtotime($end_time) <= strtotime($start_time)) {
+                throw new Exception("End time must be after start time.");
+            }
+
+            // Clean the selected days
+            $clean_days = [];
+            foreach ($selected_days as $day) {
+                $clean_day = cleanInput($day);
+                if (in_array($clean_day, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])) {
+                    $clean_days[] = $clean_day;
+                }
+            }
+
+            if (empty($clean_days)) {
+                throw new Exception("Please select at least one valid day.");
+            }
+
+            // Check for conflicts for each selected day (check for time overlap)
+            foreach ($clean_days as $day) {
+                $conflict_sql = "SELECT sd.Schedule_ID
+                                FROM schedule_details sd
+                                JOIN schedule s ON sd.Schedule_ID = s.Schedule_ID
+                                WHERE s.Instructor_ID = ? AND sd.Day = ? 
+                                AND (? < sd.End_Time AND ? > sd.Start_Time)";
+                
+                // For updates, exclude the original record being modified
+                if ($operation == 'update_schedule' && !empty($original_schedule_id)) {
+                    $conflict_sql .= " AND NOT (s.Schedule_ID = ? AND sd.Day = ? AND sd.Start_Time = ? AND sd.End_Time = ?)";
+                    $stmt = $conn->prepare($conflict_sql);
+                    $stmt->bind_param("isssssss", $instructor_id, $day, $start_time, $end_time, $original_schedule_id, $original_day, $original_start_time, $original_end_time);
+                } else {
+                    $stmt = $conn->prepare($conflict_sql);
+                    $stmt->bind_param("isss", $instructor_id, $day, $start_time, $end_time);
+                }
+                
+                $stmt->execute();
+                if ($stmt->get_result()->num_rows > 0) {
+                    throw new Exception("Schedule conflict detected! The instructor already has an overlapping class on $day between $start_time and $end_time.");
+                }
+            }
+
+            if ($operation == 'add_schedule') {
+                // Create a new schedule entry
+                $stmt = $conn->prepare("INSERT INTO schedule (Instructor_ID, Subject_ID, Class_ID) VALUES (?, ?, ?)");
+                $stmt->bind_param("iii", $instructor_id, $subject_id, $class_id);
+                $stmt->execute();
+                $schedule_id = $conn->insert_id;
+                
+                // Insert schedule details for each selected day
+                $sql = "INSERT INTO schedule_details (Schedule_ID, Start_Time, End_Time, Day) VALUES (?, ?, ?, ?)";
+                $insert_stmt = $conn->prepare($sql);
+                
+                foreach ($clean_days as $day) {
+                    $insert_stmt->bind_param("isss", $schedule_id, $start_time, $end_time, $day);
+                    if (!$insert_stmt->execute()) {
+                        throw new Exception("Error creating schedule details for $day: " . $insert_stmt->error);
                     }
                 }
-                // If not instructor, check for room conflict (already handled by original query)
-                if (!in_array(ucfirst(strtolower($day)), $conflicts)) {
-                    $conflicts[] = ucfirst(strtolower($day));
+                
+                $day_count = count($clean_days);
+                $_SESSION['success_message'] = "Schedule created successfully for $day_count day(s)!";
+            } else { // update_schedule
+                // For updates, we'll delete the old entry and insert new ones
+                $delete_sql = "DELETE FROM schedule_details WHERE Schedule_ID = ? AND Start_Time = ? AND End_Time = ? AND Day = ?";
+                $delete_stmt = $conn->prepare($delete_sql);
+                $delete_stmt->bind_param("isss", $original_schedule_id, $original_start_time, $original_end_time, $original_day);
+                if (!$delete_stmt->execute()) {
+                    throw new Exception("Error deleting old schedule: " . $delete_stmt->error);
                 }
+                
+                // Update the schedule record
+                $update_schedule_sql = "UPDATE schedule SET Instructor_ID = ?, Subject_ID = ?, Class_ID = ? WHERE Schedule_ID = ?";
+                $update_schedule_stmt = $conn->prepare($update_schedule_sql);
+                $update_schedule_stmt->bind_param("iiii", $instructor_id, $subject_id, $class_id, $original_schedule_id);
+                if (!$update_schedule_stmt->execute()) {
+                    throw new Exception("Error updating schedule: " . $update_schedule_stmt->error);
+                }
+                
+                // Insert new schedule details for each selected day
+                $sql = "INSERT INTO schedule_details (Schedule_ID, Start_Time, End_Time, Day) VALUES (?, ?, ?, ?)";
+                $insert_stmt = $conn->prepare($sql);
+                
+                foreach ($clean_days as $day) {
+                    $insert_stmt->bind_param("isss", $original_schedule_id, $start_time, $end_time, $day);
+                    if (!$insert_stmt->execute()) {
+                        throw new Exception("Error updating schedule details for $day: " . $insert_stmt->error);
+                    }
+                }
+                
+                $day_count = count($clean_days);
+                $_SESSION['success_message'] = "Schedule updated successfully for $day_count day(s)!";
+            }
+        } elseif ($operation == 'delete_schedule') {
+            $schedule_id = (int)$_POST['schedule_id'];
+            $day = cleanInput($_POST['day']);
+            $start_time = cleanInput($_POST['start_time']);
+            $end_time = cleanInput($_POST['end_time']);
+
+            $sql = "DELETE FROM schedule_details WHERE Schedule_ID = ? AND Start_Time = ? AND End_Time = ? AND Day = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("isss", $schedule_id, $start_time, $end_time, $day);
+            if ($stmt->execute()) {
+                $_SESSION['success_message'] = "Schedule deleted successfully!";
+            } else {
+                throw new Exception("Error deleting schedule: " . $stmt->error);
             }
         }
-        
-        if (!empty($conflicts)) {
-            $conn->rollback();
-            return "Schedule conflict detected on: " . implode(', ', $conflicts) . ". Either the instructor or room is already booked at this time.";
-        }
-        
-        // Insert schedule for each day
-        $sql = "INSERT INTO schedule (instructor_id, class_id, subject_id, time, day, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        
-        foreach ($days as $day) {
-            $stmt->bind_param("iiiisss", $scheduleData['instructor_id'], $scheduleData['class_id'], $scheduleData['subject_id'], $scheduleData['time'], $day, $scheduleData['status'], $scheduleData['notes']);
-            
-            if (!$stmt->execute()) {
-                $conn->rollback();
-                return "Error adding schedule: " . $stmt->error;
-            }
-        }
-        
         $conn->commit();
-        return "Schedule added successfully for " . count($days) . " day(s)!";
     } catch (Exception $e) {
         $conn->rollback();
-        return "Error: " . $e->getMessage();
+        $_SESSION['error_message'] = $e->getMessage();
     }
-}
-
-// Function to update a schedule
-function updateSchedule($conn, $schedule_id, $scheduleData) {
-    try {
-        $days = is_array($scheduleData['days']) ? $scheduleData['days'] : [$scheduleData['days']];
-        $conflicts = [];
-        
-        // Check for conflicts on all selected days (excluding current schedule, instructor cannot have overlapping times across all classes/grade levels)
-        foreach ($days as $day) {
-            $conflict_sql = "SELECT s.schedule_id, s.time, s.day, s.instructor_id, c.room, u.first_name, u.last_name 
-                            FROM schedule s 
-                            JOIN classes c ON s.class_id = c.class_id 
-                            JOIN users u ON s.instructor_id = u.user_id 
-                            WHERE s.schedule_id != ? AND s.time = ? AND s.day = ? AND (s.instructor_id = ? OR c.room = (SELECT room FROM classes WHERE class_id = ?))";
-            $conflict_stmt = $conn->prepare($conflict_sql);
-            $conflict_stmt->bind_param("issii", $schedule_id, $scheduleData['time'], $day, $scheduleData['instructor_id'], $scheduleData['class_id']);
-            $conflict_stmt->execute();
-            $result = $conflict_stmt->get_result();
-            if ($result->num_rows > 0) {
-                // Check if any conflict is for the same instructor (regardless of class/grade)
-                while ($row = $result->fetch_assoc()) {
-                    if ($row['instructor_id'] == $scheduleData['instructor_id']) {
-                        $conflicts[] = ucfirst(strtolower($day));
-                        break;
-                    }
-                }
-                // If not instructor, check for room conflict (already handled by original query)
-                if (!in_array(ucfirst(strtolower($day)), $conflicts)) {
-                    $conflicts[] = ucfirst(strtolower($day));
-                }
-            }
-        }
-        
-        if (!empty($conflicts)) {
-            return "Schedule conflict detected on: " . implode(', ', $conflicts) . ". Either the instructor or room is already booked at this time.";
-        }
-        
-        // For simplicity, we'll update the single schedule entry
-        // In a more complex system, you might want to handle multiple day updates differently
-        $day = $days[0]; // Use first day for single schedule update
-        $sql = "UPDATE schedule SET instructor_id = ?, class_id = ?, subject_id = ?, time = ?, day = ?, status = ?, notes = ? WHERE schedule_id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("iiiisssi", $scheduleData['instructor_id'], $scheduleData['class_id'], $scheduleData['subject_id'], $scheduleData['time'], $day, $scheduleData['status'], $scheduleData['notes'], $schedule_id);
-        
-        if ($stmt->execute()) {
-            if ($stmt->affected_rows > 0) {
-                return "Schedule updated successfully!";
-            } else {
-                return "No changes were made.";
-            }
-        } else {
-            return "Error updating schedule: " . $stmt->error;
-        }
-    } catch (Exception $e) {
-        return "Error: " . $e->getMessage();
-    }
-}
-
-// Function to delete a schedule
-function deleteSchedule($conn, $schedule_id) {
-    try {
-        $sql = "DELETE FROM schedule WHERE schedule_id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $schedule_id);
-        
-        if ($stmt->execute()) {
-            if ($stmt->affected_rows > 0) {
-                return "Schedule deleted successfully!";
-            } else {
-                return "Schedule not found.";
-            }
-        } else {
-            return "Error deleting schedule: " . $stmt->error;
-        }
-    } catch (Exception $e) {
-        return "Error: " . $e->getMessage();
-    }
-}
-
-// Handle form submission
-if($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $operation = $_POST['operation'] ?? 'add';
-    $schedule_id = (int)($_POST['schedule_id'] ?? 0);
     
-    if ($operation == 'delete' && $schedule_id > 0) {
-        $result = deleteSchedule($conn, $schedule_id);
-        if (strpos($result, 'successfully') !== false) {
-            $success_message = $result;
-        } else {
-            $error_message = $result;
-        }
-    } elseif ($operation == 'edit' && $schedule_id > 0) {
-        $scheduleData = [
-            'instructor_id' => (int)cleanInput($_POST['instructor_id']),
-            'class_id' => (int)cleanInput($_POST['class_id']),
-            'subject_id' => (int)cleanInput($_POST['subject_id']),
-            'time' => cleanInput($_POST['time']),
-            'days' => isset($_POST['days']) ? $_POST['days'] : [cleanInput($_POST['day'])],
-            'status' => cleanInput($_POST['status']),
-            'notes' => cleanInput($_POST['notes'])
-        ];
-        
-        $result = updateSchedule($conn, $schedule_id, $scheduleData);
-        if (strpos($result, 'successfully') !== false) {
-            $success_message = $result;
-        } else {
-            $error_message = $result;
-        }
-    } else {
-        // Add new schedule
-        $required = ['instructor_id', 'class_id', 'subject_id', 'time', 'status'];
-        $missing = [];
-        foreach ($required as $field) {
-            if (empty($_POST[$field])) $missing[] = $field;
-        }
-        
-        // Check if days are selected
-        if (empty($_POST['days']) && empty($_POST['day'])) {
-            $missing[] = 'days';
-        }
-        
-        if (!empty($missing)) {
-            $error_message = "Missing required fields: " . implode(', ', $missing);
-        } else {
-            $scheduleData = [
-                'instructor_id' => (int)cleanInput($_POST['instructor_id']),
-                'class_id' => (int)cleanInput($_POST['class_id']),
-                'subject_id' => (int)cleanInput($_POST['subject_id']),
-                'time' => cleanInput($_POST['time']),
-                'days' => isset($_POST['days']) ? $_POST['days'] : [cleanInput($_POST['day'])],
-                'status' => cleanInput($_POST['status']),
-                'notes' => cleanInput($_POST['notes'])
-            ];
-            
-            $result = addSchedule($conn, $scheduleData);
-            if (strpos($result, 'successfully') !== false) {
-                $success_message = $result;
-            } else {
-                $error_message = $result;
-            }
-        }
-    }
+    header("Location: adminSchedule.php?year=" . urlencode($redirect_year));
+    exit();
 }
+
+// Retrieve messages from session and then unset them
+if (isset($_SESSION['success_message'])) {
+    $success_message = $_SESSION['success_message'];
+    unset($_SESSION['success_message']);
+}
+if (isset($_SESSION['error_message'])) {
+    $error_message = $_SESSION['error_message'];
+    unset($_SESSION['error_message']);
+}
+
+// --- Data Fetching for Form Population ---
+
+// Get academic year filter
+$selected_year = isset($_GET['year']) ? cleanInput($_GET['year']) : date('Y') . '-' . (date('Y') + 1);
+
+// Get instructors
+$instructors_sql = "SELECT i.Instructor_ID, pb.Given_Name, pb.Last_Name
+                     FROM Instructor i
+                     JOIN Profile p ON i.Profile_ID = p.Profile_ID
+                     JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
+                     ORDER BY pb.Last_Name, pb.Given_Name";
+$instructors_result = $conn->query($instructors_sql);
+
+// Get all schedules for the main table display
+$schedules_sql = "SELECT sd.Day, sd.Start_Time, sd.End_Time,
+                         s.Schedule_ID, s.Instructor_ID, s.Subject_ID, s.Class_ID,
+                         ipb.Given_Name as Instructor_First, ipb.Last_Name as Instructor_Last,
+                         sub.Subject_Name, cl.Grade_Level, cr.Section, cr.Room
+                  FROM schedule_details sd
+                  JOIN schedule s ON sd.Schedule_ID = s.Schedule_ID
+                  JOIN Instructor i ON s.Instructor_ID = i.Instructor_ID
+                  JOIN Profile p ON i.Profile_ID = p.Profile_ID
+                  JOIN Profile_Bio ipb ON p.Profile_ID = ipb.Profile_ID
+                  JOIN Subject sub ON s.Subject_ID = sub.Subject_ID
+                  JOIN Class c ON s.Class_ID = c.Class_ID
+                  JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                  JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                  WHERE cl.School_Year = ?
+                  ORDER BY sd.Day, sd.Start_Time";
+$stmt_schedules = $conn->prepare($schedules_sql);
+$stmt_schedules->bind_param("s", $selected_year);
+$stmt_schedules->execute();
+$schedules_result = $stmt_schedules->get_result();
 ?>
 <html lang="en">
 <head>
@@ -272,84 +213,46 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Schedule Management - ErudLite</title>
     <link rel="stylesheet" href="css/essential.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="css/adminLinks.css">
     <link rel="stylesheet" href="css/adminManagement.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
-        .grade-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            background-color: #007bff;
-            color: white;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        
-        .status-badge.status-active {
-            background-color: #28a745;
-        }
-        
-        .status-badge.status-cancelled {
-            background-color: #dc3545;
-        }
-        
-        .status-badge.status-suspended {
-            background-color: #ffc107;
-            color: #212529;
-        }
-        
-        .clickable-row:hover {
-            background-color: #f8f9fa;
-            cursor: pointer;
-        }
-        
-        .no-data {
-            text-align: center;
-            color: #6c757d;
-            font-style: italic;
-        }
-        
-        small {
-            color: #6c757d;
-        }
-        
         .checkbox-group {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
-            margin-top: 5px;
+            margin-top: 8px;
         }
         
         .checkbox-label {
             display: flex;
             align-items: center;
             cursor: pointer;
-            font-size: 14px;
-            color: #495057;
-            position: relative;
+            font-weight: 500;
+            color: #333;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+        
+        .checkbox-label:hover {
+            border-color: #4CAF50;
+            background: #f8f9fa;
         }
         
         .checkbox-label input[type="checkbox"] {
             margin-right: 8px;
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
+            transform: scale(1.2);
+            accent-color: #4CAF50;
         }
         
-        .checkbox-label:hover {
-            color: #007bff;
-        }
-        
-        .checkbox-label input[type="checkbox"]:checked + .checkmark {
-            background-color: #007bff;
-        }
-        
-        @media (max-width: 768px) {
-            .checkbox-group {
-                flex-direction: column;
-                gap: 10px;
-            }
+        .checkbox-label input[type="checkbox"]:checked + span,
+        .checkbox-label:has(input[type="checkbox"]:checked) {
+            background: #e8f5e8;
+            border-color: #4CAF50;
+            color: #2e7d32;
         }
     </style>
 </head>
@@ -359,173 +262,164 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="admin-back-btn-wrap admin-back-btn-upperleft">
             <a href="adminLinks.php" class="admin-back-btn"><i class="fa fa-arrow-left"></i> Back to Admin Dashboard</a>
         </div>
-        <h1 class="page-title">Schedule Management</h1>
-        
-        <?php if (isset($success_message)): ?>
+        <h1 class="page-title">Schedule Management System</h1>
+
+        <?php if (!empty($success_message)): ?>
             <div class="message success"><?php echo $success_message; ?></div>
         <?php endif; ?>
-        
-        <?php if (isset($error_message)): ?>
+
+        <?php if (!empty($error_message)): ?>
             <div class="message error"><?php echo $error_message; ?></div>
         <?php endif; ?>
-        
+
         <section class="form-section">
-            <h2 class="form-title" id="form-title">Add New Schedule</h2>
-            <form method="POST" action="adminSchedule.php" id="schedule-form">
-                <input type="hidden" id="operation" name="operation" value="add">
-                <input type="hidden" id="schedule_id" name="schedule_id" value="">
+            <h2 class="form-title"><i class="fas fa-filter"></i> Filter by Academic Year</h2>
+            <form method="GET" action="adminSchedule.php" id="year-filter-form" style="padding: 20px;">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label" for="instructor_id">Instructor *</label>
-                        <select class="form-select" name="instructor_id" id="instructor_id" required>
-                            <option value="">Select an Instructor</option>
+                        <label class="form-label" for="year"><i class="fas fa-calendar-alt"></i> Academic Year</label>
+                        <select class="form-select" name="year" id="year" onchange="this.form.submit()">
                             <?php
-                            $instructor_sql = "SELECT u.user_id, u.first_name, u.last_name 
-                                             FROM users u 
-                                             JOIN instructors i ON u.user_id = i.instructor_id 
-                                             WHERE u.permissions = 'Instructor' 
-                                             ORDER BY u.first_name, u.last_name";
-                            $instructor_result = $conn->query($instructor_sql);
-                            
-                            if ($instructor_result->num_rows > 0) {
-                                while($instructor = $instructor_result->fetch_assoc()) {
-                                    echo "<option value='" . $instructor['user_id'] . "'>" . 
-                                         htmlspecialchars($instructor['first_name'] . ' ' . $instructor['last_name']) . "</option>";
+                            $years_sql = "SELECT DISTINCT School_Year FROM Clearance ORDER BY School_Year DESC";
+                            $years_result_dd = $conn->query($years_sql);
+                            if ($years_result_dd) {
+                                while($year = $years_result_dd->fetch_assoc()) {
+                                    $is_selected = ($year['School_Year'] == $selected_year) ? 'selected' : '';
+                                    echo "<option value='" . htmlspecialchars($year['School_Year']) . "' $is_selected>" . htmlspecialchars($year['School_Year']) . "</option>";
                                 }
                             }
                             ?>
                         </select>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="class_id">Class *</label>
-                        <select class="form-select" name="class_id" id="class_id" required>
-                            <option value="">Select a Subject first</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="subject_id">Subject *</label>
-                        <select class="form-select" name="subject_id" id="subject_id" required>
-                            <option value="">Select an Instructor first</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="days">Days *</label>
-                        <div class="checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="days[]" value="MONDAY" id="monday">
-                                <span class="checkmark"></span>
-                                Monday
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="days[]" value="TUESDAY" id="tuesday">
-                                <span class="checkmark"></span>
-                                Tuesday
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="days[]" value="WEDNESDAY" id="wednesday">
-                                <span class="checkmark"></span>
-                                Wednesday
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="days[]" value="THURSDAY" id="thursday">
-                                <span class="checkmark"></span>
-                                Thursday
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="days[]" value="FRIDAY" id="friday">
-                                <span class="checkmark"></span>
-                                Friday
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="days[]" value="SATURDAY" id="saturday">
-                                <span class="checkmark"></span>
-                                Saturday
-                            </label>
-                        </div>
-                        <input type="hidden" name="day" id="day" value="">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="time">Time *</label>
-                        <input class="form-input" name="time" id="time" type="time" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="status">Status *</label>
-                        <select class="form-select" name="status" id="status" required>
-                            <option value="">Select Status</option>
-                            <option value="Active">Active</option>
-                            <option value="Cancelled">Cancelled</option>
-                            <option value="Suspended">Suspended</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group full-width">
-                        <label class="form-label" for="notes">Notes</label>
-                        <textarea class="form-textarea" name="notes" id="notes" placeholder="Enter any additional notes (optional)"></textarea>
-                    </div>
                 </div>
-                
-                <button type="submit" class="submit-btn" id="submit-btn">Add Schedule</button>
-                <button type="button" class="cancel-btn" id="cancel-btn" style="display: none; margin-left: 10px;" onclick="resetForm()">Cancel</button>
-                <button type="button" class="delete-btn" id="delete-btn" style="display: none; margin-left: 10px;" onclick="deleteCurrentSchedule()">Delete Schedule</button>
             </form>
         </section>
-        
+
+        <section class="form-section">
+            <h2 class="form-title" id="form-title"><i class="fas fa-calendar-plus"></i> Create New Schedule</h2>
+            <form method="POST" action="adminSchedule.php?year=<?php echo urlencode($selected_year); ?>" id="schedule-form">
+                <input type="hidden" id="operation" name="operation" value="add_schedule">
+                <input type="hidden" id="original_schedule_id" name="original_schedule_id" value="">
+                <input type="hidden" id="original_day" name="original_day" value="">
+                <input type="hidden" id="original_start_time" name="original_start_time" value="">
+                <input type="hidden" id="original_end_time" name="original_end_time" value="">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="instructor_id"><i class="fas fa-user-tie"></i> Instructor *</label>
+                        <select class="form-select" name="instructor_id" id="instructor_id" required onchange="handleInstructorChange()">
+                            <option value="">Select an Instructor</option>
+                            <?php 
+                            if ($instructors_result && $instructors_result->num_rows > 0) {
+                                $instructors_result->data_seek(0);
+                                while($instructor = $instructors_result->fetch_assoc()): 
+                            ?>
+                                <option value="<?php echo $instructor['Instructor_ID']; ?>">
+                                    <?php echo htmlspecialchars($instructor['Given_Name'] . ' ' . $instructor['Last_Name']); ?>
+                                </option>
+                            <?php 
+                                endwhile; 
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="subject_id"><i class="fas fa-book"></i> Subject *</label>
+                        <select class="form-select" name="subject_id" id="subject_id" required onchange="handleSubjectChange()" disabled>
+                            <option value="">Select a Subject</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="class_id"><i class="fas fa-school"></i> Class *</label>
+                        <select class="form-select" name="class_id" id="class_id" required disabled>
+                            <option value="">Select a Class</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="days"><i class="fas fa-calendar-day"></i> Days *</label>
+                        <div class="checkbox-group" id="days">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="days[]" value="Monday" class="day-checkbox"> Monday
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="days[]" value="Tuesday" class="day-checkbox"> Tuesday
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="days[]" value="Wednesday" class="day-checkbox"> Wednesday
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="days[]" value="Thursday" class="day-checkbox"> Thursday
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="days[]" value="Friday" class="day-checkbox"> Friday
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="start_time"><i class="fas fa-clock"></i> Start Time *</label>
+                        <input type="time" class="form-select" name="start_time" id="start_time" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="end_time"><i class="fas fa-clock"></i> End Time *</label>
+                        <input type="time" class="form-select" name="end_time" id="end_time" required>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="submit-btn" id="submit-btn"><i class="fas fa-save"></i> Create Schedule</button>
+                    <button type="button" class="cancel-btn" onclick="resetForm()"><i class="fas fa-times"></i> Reset</button>
+                </div>
+            </form>
+        </section>
+
         <section class="table-section">
-            <div class="table-header">
-                <span>Current Schedules</span>
-                <div class="search-container" style="width: 70%">
-                    <input type="text" id="searchBar" class="form-input" placeholder="Search schedules..." style="width: 50%; margin-bottom: 10px;">
+            <div class="section-header">
+                <div class="header-icon-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    <h2>Current Schedules (<?php echo htmlspecialchars($selected_year); ?>)</h2>
+                </div>
+                <div class="search-wrapper">
                     <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchBar" class="search-input" placeholder="Search schedules...">
                 </div>
             </div>
             <div class="table-container">
-                <table class="subjects-table" id="schedules-table">
+                <table class="data-table" id="schedules-table">
                     <thead>
                         <tr>
-                            <th>Instructor</th>
-                            <th>Class</th>
-                            <th>Subject</th>
-                            <th>Day</th>
+                            <th><i class="fas fa-user-tie"></i> Instructor</th>
+                            <th><i class="fas fa-book"></i> Subject</th>
+                            <th><i class="fas fa-school"></i> Class</th>
+                            <th><i class="fas fa-calendar-day"></i> Day</th>
+                            <th><i class="fas fa-clock"></i> Time Period</th>
+                            <th><i class="fas fa-cog"></i> Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php
-                        $sql = "SELECT s.schedule_id, s.instructor_id, s.class_id, s.subject_id, s.time, s.day, s.status, s.notes,
-                                       u.first_name, u.last_name, 
-                                       c.grade_level, c.section, c.room,
-                                       sub.subject_name
-                                FROM schedule s 
-                                JOIN users u ON s.instructor_id = u.user_id 
-                                JOIN classes c ON s.class_id = c.class_id
-                                JOIN subjects sub ON s.subject_id = sub.subject_id
-                                ORDER BY s.day, s.time, c.grade_level, c.section";
-                        $result = $conn->query($sql);
-                        
-                        if ($result && $result->num_rows > 0) {
-                            while($row = $result->fetch_assoc()) {
-                                echo "<tr class='clickable-row' onclick='editSchedule(" . 
-                                     $row['schedule_id'] . ", {" .
-                                     "instructor_id: " . $row['instructor_id'] . ", " .
-                                     "class_id: " . $row['class_id'] . ", " .
-                                     "subject_id: " . $row['subject_id'] . ", " .
-                                     "time: \"" . htmlspecialchars($row['time']) . "\", " .
-                                     "day: \"" . htmlspecialchars($row['day']) . "\", " .
-                                     "status: \"" . htmlspecialchars($row['status']) . "\", " .
-                                     "notes: \"" . htmlspecialchars($row['notes']) . "\"" .
-                                     "})'>";
-                                echo "<td>" . htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) . "</td>";
-                                echo "<td>Grade " . $row['grade_level'] . " - " . htmlspecialchars($row['section']) . "</td>";
-                                echo "<td>" . htmlspecialchars($row['subject_name']) . "</td>";
-                                echo "<td>" . ucfirst(strtolower($row['day'])) . "</td>";
-                                echo "</tr>";
-                            }
+                        <?php 
+                        if ($schedules_result && $schedules_result->num_rows > 0) {
+                            while($schedule = $schedules_result->fetch_assoc()): 
+                        ?>
+                            <tr style="cursor:pointer;" onclick='editSchedule(<?php echo json_encode($schedule); ?>)'>
+                                <td><i class="fas fa-user-tie"></i> <?php echo htmlspecialchars($schedule['Instructor_First'] . ' ' . $schedule['Instructor_Last']); ?></td>
+                                <td><?php echo htmlspecialchars($schedule['Subject_Name']); ?></td>
+                                <td>Grade <?php echo htmlspecialchars($schedule['Grade_Level']); ?> - <?php echo htmlspecialchars($schedule['Section']); ?> (Room <?php echo htmlspecialchars($schedule['Room']); ?>)</td>
+                                <td><?php echo htmlspecialchars($schedule['Day']); ?></td>
+                                <td><?php echo date('g:i A', strtotime($schedule['Start_Time'])) . ' - ' . date('g:i A', strtotime($schedule['End_Time'])); ?></td>
+                                <td class="action-buttons">
+                                    <button class="edit-btn" onclick="event.stopPropagation(); editSchedule(<?php echo htmlspecialchars(json_encode($schedule)); ?>)"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="delete-btn" onclick="event.stopPropagation(); deleteSchedule(<?php echo $schedule['Schedule_ID']; ?>, '<?php echo $schedule['Day']; ?>', '<?php echo $schedule['Start_Time']; ?>', '<?php echo $schedule['End_Time']; ?>')"><i class="fas fa-trash"></i> Delete</button>
+                                </td>
+                            </tr>
+                        <?php 
+                            endwhile;
                         } else {
-                            echo "<tr><td colspan='7' class='no-data'>No schedules found. Add your first schedule above!</td></tr>";
+                            echo "<tr><td colspan='6' class='no-data'><i class='fas fa-info-circle'></i> No schedules found for this academic year.</td></tr>";
                         }
                         ?>
                     </tbody>
@@ -535,134 +429,219 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
-    <script src="js/adminManage.js"></script>
     <script>
-        // Override editSchedule function for schedules
-        function editSchedule(scheduleId, scheduleData) {
-            // Update form title
-            document.getElementById('form-title').textContent = 'Edit Schedule';
-            
-            // Update submit button
-            document.getElementById('submit-btn').textContent = 'Update Schedule';
-            
-            // Show cancel and delete buttons
-            document.getElementById('cancel-btn').style.display = 'inline-block';
-            document.getElementById('delete-btn').style.display = 'inline-block';
-            
-            // Set operation mode
-            document.getElementById('operation').value = 'edit';
-            document.getElementById('schedule_id').value = scheduleId;
-            
-            // Populate form fields
-            document.getElementById('instructor_id').value = scheduleData.instructor_id;
-            document.getElementById('time').value = scheduleData.time;
-            document.getElementById('status').value = scheduleData.status;
-            document.getElementById('notes').value = scheduleData.notes;
-            
-            // Load subjects for the selected instructor and then set the subject
+        // Get the current academic year for AJAX requests
+        const currentYear = '<?php echo htmlspecialchars($selected_year); ?>';
+
+        function handleInstructorChange() {
+            const instructorId = document.getElementById('instructor_id').value;
             const subjectSelect = document.getElementById('subject_id');
             const classSelect = document.getElementById('class_id');
             
-            subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
-            classSelect.innerHTML = '<option value="">Loading classes...</option>';
+            // Reset subsequent dropdowns
+            subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
+            subjectSelect.disabled = true;
+            classSelect.innerHTML = '<option value="">Select a Class</option>';
+            classSelect.disabled = true;
             
-            fetch(`adminSchedule.php?action=get_subjects&instructor_id=${scheduleData.instructor_id}`)
+            if (instructorId) {
+                // Show loading indicator
+                subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
+                
+                // Make AJAX request to get subjects
+                fetch('ajax_schedule_handlers.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=get_subjects&instructor_id=${instructorId}`
+                })
                 .then(response => response.json())
-                .then(subjects => {
-                    subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
-                    
-                    if (subjects.length > 0) {
-                        subjects.forEach(subject => {
+                .then(data => {
+                    if (data.success) {
+                        subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
+                        data.subjects.forEach(subject => {
                             const option = document.createElement('option');
-                            option.value = subject.subject_id;
-                            option.textContent = `${subject.subject_name} (Grade ${subject.grade_level})`;
-                            if (subject.subject_id == scheduleData.subject_id) {
-                                option.selected = true;
-                            }
+                            option.value = subject.Subject_ID;
+                            option.textContent = `${subject.Subject_Name} (Grade ${subject.Grade_Level})`;
                             subjectSelect.appendChild(option);
                         });
-                        
-                        // After subjects are loaded, load classes for the selected subject
-                        if (scheduleData.subject_id) {
-                            return fetch(`adminSchedule.php?action=get_classes&subject_id=${scheduleData.subject_id}`);
-                        }
+                        subjectSelect.disabled = false;
                     } else {
-                        subjectSelect.innerHTML = '<option value="">No subjects assigned to this instructor</option>';
-                    }
-                })
-                .then(response => response ? response.json() : null)
-                .then(classes => {
-                    if (classes) {
-                        classSelect.innerHTML = '<option value="">Select a Class</option>';
-                        
-                        if (classes.length > 0) {
-                            classes.forEach(classItem => {
-                                const option = document.createElement('option');
-                                option.value = classItem.class_id;
-                                option.textContent = `Grade ${classItem.grade_level} - ${classItem.section} (Room: ${classItem.room})`;
-                                if (classItem.class_id == scheduleData.class_id) {
-                                    option.selected = true;
-                                }
-                                classSelect.appendChild(option);
-                            });
-                        } else {
-                            classSelect.innerHTML = '<option value="">No classes found for this subject grade level</option>';
-                        }
+                        subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading data:', error);
+                    console.error('Error:', error);
                     subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
+                });
+            }
+        }
+
+        function handleSubjectChange() {
+            const subjectId = document.getElementById('subject_id').value;
+            const classSelect = document.getElementById('class_id');
+            
+            // Reset class dropdown
+            classSelect.innerHTML = '<option value="">Select a Class</option>';
+            classSelect.disabled = true;
+            
+            if (subjectId) {
+                // Show loading indicator
+                classSelect.innerHTML = '<option value="">Loading classes...</option>';
+                
+                // Make AJAX request to get classes
+                fetch('ajax_schedule_handlers.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=get_classes&subject_id=${subjectId}&year=${encodeURIComponent(currentYear)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        classSelect.innerHTML = '<option value="">Select a Class</option>';
+                        data.classes.forEach(classItem => {
+                            const option = document.createElement('option');
+                            option.value = classItem.Class_ID;
+                            option.textContent = `Grade ${classItem.Grade_Level} - ${classItem.Section} (Room ${classItem.Room})`;
+                            classSelect.appendChild(option);
+                        });
+                        classSelect.disabled = false;
+                    } else {
+                        classSelect.innerHTML = '<option value="">Error loading classes</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
                     classSelect.innerHTML = '<option value="">Error loading classes</option>';
                 });
-            
-            // Clear all checkboxes first
-            document.querySelectorAll('input[name="days[]"]').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-            
-            // Set the day checkbox for editing
-            const dayCheckbox = document.getElementById(scheduleData.day.toLowerCase());
-            if (dayCheckbox) {
-                dayCheckbox.checked = true;
             }
+        }
+
+        function editSchedule(scheduleData) {
+            document.getElementById('operation').value = 'update_schedule';
+            document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update Schedule';
+            document.getElementById('form-title').innerHTML = '<i class="fas fa-edit"></i> Edit Schedule';
+
+            // Store original keys for the update WHERE clause
+            document.getElementById('original_schedule_id').value = scheduleData.Schedule_ID;
+            document.getElementById('original_day').value = scheduleData.Day;
+            document.getElementById('original_start_time').value = scheduleData.Start_Time;
+            document.getElementById('original_end_time').value = scheduleData.End_Time;
+
+            // Set simple values
+            document.getElementById('start_time').value = scheduleData.Start_Time;
+            document.getElementById('end_time').value = scheduleData.End_Time;
+
+            // Set the day checkbox
+            const dayCheckboxes = document.querySelectorAll('.day-checkbox');
+            dayCheckboxes.forEach(checkbox => {
+                checkbox.checked = (checkbox.value === scheduleData.Day);
+            });
+
+            // Set instructor first
+            const instructorSelect = document.getElementById('instructor_id');
+            instructorSelect.value = scheduleData.Instructor_ID;
             
-            // Set hidden day field for backward compatibility
-            document.getElementById('day').value = scheduleData.day;
+            // Load subjects for this instructor
+            handleInstructorChange();
+            
+            // After subjects load, set the subject value
+            setTimeout(() => {
+                const subjectSelect = document.getElementById('subject_id');
+                subjectSelect.value = scheduleData.Subject_ID;
+                
+                // Load classes for this subject
+                handleSubjectChange();
+                
+                // After classes load, set the class value
+                setTimeout(() => {
+                    const classSelect = document.getElementById('class_id');
+                    classSelect.value = scheduleData.Class_ID;
+                }, 500);
+            }, 500);
             
             // Scroll to form
-            document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+            setTimeout(() => {
+                const formSection = document.querySelector('.form-section:nth-of-type(2)');
+                const header = document.querySelector('#header-placeholder');
+                const headerHeight = header ? header.offsetHeight : 0;
+                const offset = headerHeight + 20;
+                
+                window.scrollTo({
+                    top: formSection.offsetTop - offset,
+                    behavior: 'smooth'
+                });
+            }, 100);
         }
-        
-        // Reset form function
-        function resetForm() {
-            document.getElementById('form-title').textContent = 'Add New Schedule';
-            document.getElementById('submit-btn').textContent = 'Add Schedule';
-            document.getElementById('cancel-btn').style.display = 'none';
-            document.getElementById('delete-btn').style.display = 'none';
-            document.getElementById('operation').value = 'add';
-            document.getElementById('schedule_id').value = '';
-            document.getElementById('schedule-form').reset();
-            document.getElementById('operation').value = 'add';
-            
-            // Clear all checkboxes
-            document.querySelectorAll('input[name="days[]"]').forEach(checkbox => {
-                checkbox.checked = false;
-            });
-            
-            // Reset subjects and classes dropdowns
-            document.getElementById('subject_id').innerHTML = '<option value="">Select an Instructor first</option>';
-            document.getElementById('class_id').innerHTML = '<option value="">Select a Subject first</option>';
-        }
-        
-        // Delete schedule function
-        function deleteCurrentSchedule() {
-            if (confirm('Are you sure you want to delete this schedule?')) {
-                document.getElementById('operation').value = 'delete';
-                document.getElementById('schedule-form').submit();
+
+        function deleteSchedule(scheduleId, day, startTime, endTime) {
+            if(confirm('Are you sure you want to delete this schedule entry?')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'adminSchedule.php?year=<?php echo urlencode($selected_year); ?>';
+
+                const operationInput = document.createElement('input');
+                operationInput.type = 'hidden';
+                operationInput.name = 'operation';
+                operationInput.value = 'delete_schedule';
+                form.appendChild(operationInput);
+
+                const scheduleIdInput = document.createElement('input');
+                scheduleIdInput.type = 'hidden';
+                scheduleIdInput.name = 'schedule_id';
+                scheduleIdInput.value = scheduleId;
+                form.appendChild(scheduleIdInput);
+
+                const dayInput = document.createElement('input');
+                dayInput.type = 'hidden';
+                dayInput.name = 'day';
+                dayInput.value = day;
+                form.appendChild(dayInput);
+
+                const startTimeInput = document.createElement('input');
+                startTimeInput.type = 'hidden';
+                startTimeInput.name = 'start_time';
+                startTimeInput.value = startTime;
+                form.appendChild(startTimeInput);
+
+                const endTimeInput = document.createElement('input');
+                endTimeInput.type = 'hidden';
+                endTimeInput.name = 'end_time';
+                endTimeInput.value = endTime;
+                form.appendChild(endTimeInput);
+
+                document.body.appendChild(form);
+                form.submit();
             }
         }
-        
+
+        function resetForm() {
+            const year = document.getElementById('year').value;
+            window.location.href = 'adminSchedule.php?year=' + encodeURIComponent(year);
+        }
+
+        // Form validation
+        document.getElementById('schedule-form').addEventListener('submit', function(e) {
+            const checkedDays = document.querySelectorAll('.day-checkbox:checked');
+            if (checkedDays.length === 0) {
+                e.preventDefault();
+                alert('Please select at least one day for the schedule.');
+                return false;
+            }
+            
+            const startTime = document.getElementById('start_time').value;
+            const endTime = document.getElementById('end_time').value;
+            
+            if (startTime && endTime && startTime >= endTime) {
+                e.preventDefault();
+                alert('End time must be after start time.');
+                return false;
+            }
+        });
+
         // Search functionality
         document.getElementById('searchBar').addEventListener('keyup', function() {
             let filter = this.value.toLowerCase();
@@ -671,90 +650,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 let text = row.textContent.toLowerCase();
                 row.style.display = text.indexOf(filter) > -1 ? "" : "none";
             });
-        });
-        
-        // Form validation
-        document.getElementById('schedule-form').addEventListener('submit', function(e) {
-            const checkboxes = document.querySelectorAll('input[name="days[]"]');
-            const isChecked = Array.from(checkboxes).some(checkbox => checkbox.checked);
-            
-            if (!isChecked) {
-                e.preventDefault();
-                alert('Please select at least one day for the schedule.');
-                return false;
-            }
-        });
-        
-        // Handle instructor selection to load subjects
-        document.getElementById('instructor_id').addEventListener('change', function() {
-            const instructorId = this.value;
-            const subjectSelect = document.getElementById('subject_id');
-            const classSelect = document.getElementById('class_id');
-            
-            // Clear current subjects and classes
-            subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
-            classSelect.innerHTML = '<option value="">Select a Subject first</option>';
-            
-            if (instructorId) {
-                // Fetch subjects for this instructor
-                fetch(`adminSchedule.php?action=get_subjects&instructor_id=${instructorId}`)
-                    .then(response => response.json())
-                    .then(subjects => {
-                        subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
-                        
-                        if (subjects.length > 0) {
-                            subjects.forEach(subject => {
-                                const option = document.createElement('option');
-                                option.value = subject.subject_id;
-                                option.textContent = `${subject.subject_name} (Grade ${subject.grade_level})`;
-                                subjectSelect.appendChild(option);
-                            });
-                        } else {
-                            subjectSelect.innerHTML = '<option value="">No subjects assigned to this instructor</option>';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading subjects:', error);
-                        subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
-                    });
-            } else {
-                subjectSelect.innerHTML = '<option value="">Select an Instructor first</option>';
-            }
-        });
-        
-        // Handle subject selection to load classes
-        document.getElementById('subject_id').addEventListener('change', function() {
-            const subjectId = this.value;
-            const classSelect = document.getElementById('class_id');
-            
-            // Clear current classes
-            classSelect.innerHTML = '<option value="">Loading classes...</option>';
-            
-            if (subjectId) {
-                // Fetch classes for this subject's grade level
-                fetch(`adminSchedule.php?action=get_classes&subject_id=${subjectId}`)
-                    .then(response => response.json())
-                    .then(classes => {
-                        classSelect.innerHTML = '<option value="">Select a Class</option>';
-                        
-                        if (classes.length > 0) {
-                            classes.forEach(classItem => {
-                                const option = document.createElement('option');
-                                option.value = classItem.class_id;
-                                option.textContent = `Grade ${classItem.grade_level} - ${classItem.section} (Room: ${classItem.room})`;
-                                classSelect.appendChild(option);
-                            });
-                        } else {
-                            classSelect.innerHTML = '<option value="">No classes found for this subject grade level</option>';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading classes:', error);
-                        classSelect.innerHTML = '<option value="">Error loading classes</option>';
-                    });
-            } else {
-                classSelect.innerHTML = '<option value="">Select a Subject first</option>';
-            }
         });
     </script>
 </body>
