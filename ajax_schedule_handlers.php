@@ -1,7 +1,6 @@
 <?php
 require_once 'includes/db.php';
 
-
 // Function to clean input data
 function cleanInput($data) {
     return trim(htmlspecialchars($data));

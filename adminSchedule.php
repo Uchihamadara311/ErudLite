@@ -223,7 +223,6 @@ $schedules_result = $stmt_schedules->get_result();
             gap: 15px;
             margin-top: 8px;
         }
-        
         .checkbox-label {
             display: flex;
             align-items: center;
@@ -236,23 +235,38 @@ $schedules_result = $stmt_schedules->get_result();
             transition: all 0.3s ease;
             background: #fff;
         }
-        
         .checkbox-label:hover {
             border-color: #4CAF50;
             background: #f8f9fa;
         }
-        
         .checkbox-label input[type="checkbox"] {
             margin-right: 8px;
             transform: scale(1.2);
             accent-color: #4CAF50;
         }
-        
         .checkbox-label input[type="checkbox"]:checked + span,
         .checkbox-label:has(input[type="checkbox"]:checked) {
             background: #e8f5e8;
             border-color: #4CAF50;
             color: #2e7d32;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .delete-btn {
+            background: #e53935;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 14px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            display: inline-block;
+        }
+        .delete-btn:hover {
+            background: #b71c1c;
         }
     </style>
 </head>
@@ -373,6 +387,7 @@ $schedules_result = $stmt_schedules->get_result();
                 <div class="button-group">
                     <button type="submit" class="submit-btn" id="submit-btn"><i class="fas fa-save"></i> Create Schedule</button>
                     <button type="button" class="cancel-btn" onclick="resetForm()"><i class="fas fa-times"></i> Reset</button>
+                    <button type="button" class="delete-btn" id="form-delete-btn" style="display:none;margin-left:8px;" onclick="deleteSelectedSchedule()"><i class="fas fa-trash"></i> Delete</button>
                 </div>
             </form>
         </section>
@@ -413,7 +428,7 @@ $schedules_result = $stmt_schedules->get_result();
                                 <td><?php echo date('g:i A', strtotime($schedule['Start_Time'])) . ' - ' . date('g:i A', strtotime($schedule['End_Time'])); ?></td>
                                 <td class="action-buttons">
                                     <button class="edit-btn" onclick="event.stopPropagation(); editSchedule(<?php echo htmlspecialchars(json_encode($schedule)); ?>)"><i class="fas fa-edit"></i> Edit</button>
-                                    <button class="delete-btn" onclick="event.stopPropagation(); deleteSchedule(<?php echo $schedule['Schedule_ID']; ?>, '<?php echo $schedule['Day']; ?>', '<?php echo $schedule['Start_Time']; ?>', '<?php echo $schedule['End_Time']; ?>')"><i class="fas fa-trash"></i> Delete</button>
+                                    <button class="delete-btn" onclick="event.stopPropagation(); deleteSchedule(<?php echo $schedule['Schedule_ID']; ?>, '<?php echo addslashes($schedule['Day']); ?>', '<?php echo addslashes($schedule['Start_Time']); ?>', '<?php echo addslashes($schedule['End_Time']); ?>')"><i class="fas fa-trash"></i> Delete</button>
                                 </td>
                             </tr>
                         <?php 
@@ -525,6 +540,9 @@ $schedules_result = $stmt_schedules->get_result();
             document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update Schedule';
             document.getElementById('form-title').innerHTML = '<i class="fas fa-edit"></i> Edit Schedule';
 
+            // Show delete button for editing
+            document.getElementById('form-delete-btn').style.display = 'inline-block';
+
             // Store original keys for the update WHERE clause
             document.getElementById('original_schedule_id').value = scheduleData.Schedule_ID;
             document.getElementById('original_day').value = scheduleData.Day;
@@ -577,6 +595,53 @@ $schedules_result = $stmt_schedules->get_result();
             }, 100);
         }
 
+        function deleteSelectedSchedule() {
+            // Use the values from the form's hidden fields
+            const scheduleId = document.getElementById('original_schedule_id').value;
+            const day = document.getElementById('original_day').value;
+            const startTime = document.getElementById('original_start_time').value;
+            const endTime = document.getElementById('original_end_time').value;
+            if (!scheduleId || !day || !startTime || !endTime) return;
+            if(confirm('Are you sure you want to delete this schedule entry?')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'adminSchedule.php?year=<?php echo urlencode($selected_year); ?>';
+
+                const operationInput = document.createElement('input');
+                operationInput.type = 'hidden';
+                operationInput.name = 'operation';
+                operationInput.value = 'delete_schedule';
+                form.appendChild(operationInput);
+
+                const scheduleIdInput = document.createElement('input');
+                scheduleIdInput.type = 'hidden';
+                scheduleIdInput.name = 'schedule_id';
+                scheduleIdInput.value = scheduleId;
+                form.appendChild(scheduleIdInput);
+
+                const dayInput = document.createElement('input');
+                dayInput.type = 'hidden';
+                dayInput.name = 'day';
+                dayInput.value = day;
+                form.appendChild(dayInput);
+
+                const startTimeInput = document.createElement('input');
+                startTimeInput.type = 'hidden';
+                startTimeInput.name = 'start_time';
+                startTimeInput.value = startTime;
+                form.appendChild(startTimeInput);
+
+                const endTimeInput = document.createElement('input');
+                endTimeInput.type = 'hidden';
+                endTimeInput.name = 'end_time';
+                endTimeInput.value = endTime;
+                form.appendChild(endTimeInput);
+
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
         function deleteSchedule(scheduleId, day, startTime, endTime) {
             if(confirm('Are you sure you want to delete this schedule entry?')) {
                 const form = document.createElement('form');
@@ -621,6 +686,10 @@ $schedules_result = $stmt_schedules->get_result();
         function resetForm() {
             const year = document.getElementById('year').value;
             window.location.href = 'adminSchedule.php?year=' + encodeURIComponent(year);
+            // Hide delete button on reset
+            setTimeout(function() {
+                document.getElementById('form-delete-btn').style.display = 'none';
+            }, 200);
         }
 
         // Form validation

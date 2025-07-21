@@ -48,7 +48,6 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['profile_id'] = $user['Profile_ID'];
                 $_SESSION['name'] = $user['Given_Name'];
                 $_SESSION['role_id'] = $user['Role_ID'];
-
                 // Update login information
                 $update_stmt = $conn->prepare(
                     "UPDATE Login_Info

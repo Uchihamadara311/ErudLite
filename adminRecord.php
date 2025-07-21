@@ -1,5 +1,6 @@
 <?php 
 require_once 'includes/db.php';
+session_start();
 
 // Ensure user is logged in and has admin permissions
 if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
@@ -12,6 +13,8 @@ if (isset($_GET['action'])) {
     header('Content-Type: application/json');
     
     if ($_GET['action'] == 'get_students' && isset($_GET['class_id'])) {
+        // AJAX handler: Get students enrolled in the selected class
+        // Uses Enrollment table to find students for the given Class_ID
         try {
             $class_id = (int)$_GET['class_id'];
             $sql = "SELECT DISTINCT s.Student_ID, pb.Given_Name, pb.Last_Name 
@@ -37,13 +40,15 @@ if (isset($_GET['action'])) {
     }
     
     if ($_GET['action'] == 'get_subjects' && isset($_GET['class_id'])) {
+        // AJAX handler: Get subjects assigned to the selected class
+        // Uses Assigned_Subject table to find subjects for the given Class_ID
+        // This ensures subjects are shown even if Subject.Clearance_ID does not match Class.Clearance_ID
         try {
             $class_id = (int)$_GET['class_id'];
             $sql = "SELECT DISTINCT s.Subject_ID, s.Subject_Name 
-                    FROM Subject s
-                    JOIN Class c ON c.Class_ID = ?
-                    JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
-                    WHERE s.Clearance_ID = cl.Clearance_ID
+                    FROM Assigned_Subject asub
+                    JOIN Subject s ON asub.Subject_ID = s.Subject_ID
+                    WHERE asub.Class_ID = ?
                     ORDER BY s.Subject_Name";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $class_id);
@@ -62,21 +67,26 @@ if (isset($_GET['action'])) {
     
     if ($_GET['action'] == 'get_grades' && isset($_GET['class_id'])) {
         $class_id = (int)$_GET['class_id'];
-        $sql = "SELECT g.Grade_ID, g.Grade_Value, g.Grade_Letter, g.Quarter, g.Date_Recorded,
-                       pb.Given_Name, pb.Last_Name, s.Subject_Name
-                FROM Grades g
-                JOIN Student st ON g.Student_ID = st.Student_ID
+        $sql = "SELECT rd.Record_ID as Grade_ID, rd.Grade as Grade_Value, 
+                       r.Student_ID, pb.Given_Name, pb.Last_Name, s.Subject_Name, cl.Term as Quarter, rd.Record_Date as Date_Recorded,
+                       rd.Grade as Grade_Value
+                FROM Record r
+                JOIN Record_Details rd ON r.Record_ID = rd.Record_ID
+                JOIN Student st ON r.Student_ID = st.Student_ID
                 JOIN Profile p ON st.Profile_ID = p.Profile_ID
                 JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
-                JOIN Subject s ON g.Subject_ID = s.Subject_ID
-                WHERE g.Class_ID = ?
-                ORDER BY pb.Last_Name, pb.Given_Name, s.Subject_Name, g.Quarter";
+                JOIN Subject s ON r.Subject_ID = s.Subject_ID
+                JOIN Clearance cl ON rd.Clearance_ID = cl.Clearance_ID
+                WHERE r.Subject_ID = s.Subject_ID AND cl.Clearance_ID = rd.Clearance_ID AND r.Student_ID = st.Student_ID
+                AND cl.Term IS NOT NULL AND cl.Clearance_ID IN (SELECT Clearance_ID FROM Class WHERE Class_ID = ?)
+                ORDER BY pb.Last_Name, pb.Given_Name, s.Subject_Name, cl.Term";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("i", $class_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $grades = [];
         while($row = $result->fetch_assoc()) {
+            $row['Grade_Letter'] = calculateLetterGrade($row['Grade_Value']);
             $grades[] = $row;
         }
         echo json_encode($grades);
@@ -123,21 +133,25 @@ if (isset($_GET['action'])) {
     
     if ($_GET['action'] == 'get_student_grades' && isset($_GET['student_id'])) {
         $student_id = (int)$_GET['student_id'];
-        $sql = "SELECT g.Grade_ID, g.Grade_Value, g.Grade_Letter, g.Quarter, g.Date_Recorded,
-                       s.Subject_Name, pb.Given_Name, pb.Last_Name
-                FROM Grades g
-                JOIN Subject s ON g.Subject_ID = s.Subject_ID
-                JOIN Student st ON g.Student_ID = st.Student_ID
+        $sql = "SELECT rd.Record_ID as Grade_ID, rd.Grade as Grade_Value, 
+                       r.Student_ID, pb.Given_Name, pb.Last_Name, s.Subject_Name, cl.Term as Quarter, rd.Record_Date as Date_Recorded,
+                       rd.Grade as Grade_Value
+                FROM Record r
+                JOIN Record_Details rd ON r.Record_ID = rd.Record_ID
+                JOIN Student st ON r.Student_ID = st.Student_ID
                 JOIN Profile p ON st.Profile_ID = p.Profile_ID
                 JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
-                WHERE g.Student_ID = ?
-                ORDER BY s.Subject_Name, g.Quarter";
+                JOIN Subject s ON r.Subject_ID = s.Subject_ID
+                JOIN Clearance cl ON rd.Clearance_ID = cl.Clearance_ID
+                WHERE r.Student_ID = ?
+                ORDER BY s.Subject_Name, cl.Term";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("i", $student_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $grades = [];
         while($row = $result->fetch_assoc()) {
+            $row['Grade_Letter'] = calculateLetterGrade($row['Grade_Value']);
             $grades[] = $row;
         }
         echo json_encode($grades);
@@ -170,61 +184,86 @@ function calculateLetterGrade($grade_value) {
 // Handle form submission
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $operation = isset($_POST['operation']) ? $_POST['operation'] : 'add_grade';
-    
     if ($operation == 'add_grade') {
         $student_id = (int)$_POST['student_id'];
         $subject_id = (int)$_POST['subject_id'];
         $class_id = (int)$_POST['class_id'];
-        $quarter = cleanInput($_POST['quarter']);
+        $term = cleanInput($_POST['quarter']); // Renamed for consistency
         $grade_value = (float)$_POST['grade_value'];
         $grade_letter = calculateLetterGrade($grade_value);
-        
-        // Check if grade already exists
-        $check_sql = "SELECT Grade_ID FROM Grades WHERE Student_ID = ? AND Subject_ID = ? AND Quarter = ?";
-        $stmt = $conn->prepare($check_sql);
-        $stmt->bind_param("iis", $student_id, $subject_id, $quarter);
+
+        // Get Clearance_ID for this class and term
+        $clearance_sql = "SELECT cl.Clearance_ID FROM Class c JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID WHERE c.Class_ID = ? AND cl.Term = ?";
+        $stmt = $conn->prepare($clearance_sql);
+        $stmt->bind_param("is", $class_id, $term);
         $stmt->execute();
-        
-        if ($stmt->get_result()->num_rows > 0) {
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $clearance_id = $row['Clearance_ID'];
+        } else {
+            $error_message = "No clearance found for this class and term.";
+            return;
+        }
+
+        // Check if record already exists for this student, subject, instructor, and clearance
+        $instructor_id = 1; // You may want to set this dynamically
+        $check_sql = "SELECT rd.Record_ID FROM Record r JOIN Record_Details rd ON r.Record_ID = rd.Record_ID WHERE r.Student_ID = ? AND r.Subject_ID = ? AND r.Instructor_ID = ? AND rd.Clearance_ID = ?";
+        $stmt = $conn->prepare($check_sql);
+        $stmt->bind_param("iiii", $student_id, $subject_id, $instructor_id, $clearance_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
             $error_message = "Grade already exists for this student, subject, and quarter.";
         } else {
-            // Insert new grade
-            $sql = "INSERT INTO Grades (Student_ID, Subject_ID, Class_ID, Quarter, Grade_Value, Grade_Letter, Date_Recorded, Recorded_By) 
-                    VALUES (?, ?, ?, ?, ?, ?, CURDATE(), 1)";
+            // Insert into Record
+            $sql = "INSERT INTO Record (Student_ID, Instructor_ID, Subject_ID) VALUES (?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("iiisds", $student_id, $subject_id, $class_id, $quarter, $grade_value, $grade_letter);
-            
+            $stmt->bind_param("iii", $student_id, $instructor_id, $subject_id);
             if ($stmt->execute()) {
-                $success_message = "Grade recorded successfully!";
+                $record_id = $stmt->insert_id;
+                // Insert into Record_Details
+                $sql = "INSERT INTO Record_Details (Record_ID, Clearance_ID, Grade, Record_Date) VALUES (?, ?, ?, CURDATE())";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("iii", $record_id, $clearance_id, $grade_value);
+                if ($stmt->execute()) {
+                    $success_message = "Grade recorded successfully!";
+                } else {
+                    $error_message = "Error recording grade details: " . $stmt->error;
+                }
             } else {
                 $error_message = "Error recording grade: " . $stmt->error;
             }
         }
     } elseif ($operation == 'update_grade') {
-        $grade_id = (int)$_POST['grade_id'];
+        $record_id = (int)$_POST['grade_id'];
         $grade_value = (float)$_POST['grade_value'];
-        $grade_letter = calculateLetterGrade($grade_value);
-        
-        $sql = "UPDATE Grades SET Grade_Value = ?, Grade_Letter = ?, Date_Recorded = CURDATE() WHERE Grade_ID = ?";
+        // Update Record_Details
+        $sql = "UPDATE Record_Details SET Grade = ?, Record_Date = CURDATE() WHERE Record_ID = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("dsi", $grade_value, $grade_letter, $grade_id);
-        
+        $stmt->bind_param("ii", $grade_value, $record_id);
         if ($stmt->execute()) {
             $success_message = "Grade updated successfully!";
         } else {
             $error_message = "Error updating grade: " . $stmt->error;
         }
     } elseif ($operation == 'delete_grade') {
-        $grade_id = (int)$_POST['grade_id'];
-        
-        $sql = "DELETE FROM Grades WHERE Grade_ID = ?";
+        $record_id = (int)$_POST['grade_id'];
+        // Delete from Record_Details first
+        $sql = "DELETE FROM Record_Details WHERE Record_ID = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $grade_id);
-        
+        $stmt->bind_param("i", $record_id);
         if ($stmt->execute()) {
-            $success_message = "Grade deleted successfully!";
+            // Then delete from Record
+            $sql = "DELETE FROM Record WHERE Record_ID = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $record_id);
+            if ($stmt->execute()) {
+                $success_message = "Grade deleted successfully!";
+            } else {
+                $error_message = "Error deleting grade record: " . $stmt->error;
+            }
         } else {
-            $error_message = "Error deleting grade: " . $stmt->error;
+            $error_message = "Error deleting grade details: " . $stmt->error;
         }
     }
 }
@@ -295,18 +334,66 @@ $classes_result = $stmt->get_result();
         <!-- Class Selection -->
         <section class="form-section">
             <h2 class="form-title"><i class="fas fa-school"></i> Select Class to Manage Grades</h2>
-            <div style="padding: 20px;">
+            <form id="class-filter-form" method="GET" style="padding: 20px;">
                 <div class="form-grid">
-                    <?php while($class = $classes_result->fetch_assoc()): ?>
-                        <div class="form-group">
-                            <button type="button" class="submit-btn" onclick="loadClassStudents(<?php echo $class['Class_ID']; ?>)">
-                                <i class="fas fa-graduation-cap"></i> Grade <?php echo $class['Grade_Level']; ?> - <?php echo htmlspecialchars($class['Section']); ?>
-                                <br><small>Room <?php echo htmlspecialchars($class['Room']); ?></small>
-                            </button>
-                        </div>
-                    <?php endwhile; ?>
+                    <div class="form-group">
+                        <label class="form-label" for="filter_grade"><i class="fas fa-layer-group"></i> Grade Level</label>
+                        <select class="form-select" name="filter_grade" id="filter_grade" onchange="updateClassList()">
+                            <option value="">All Grades</option>
+                            <?php for($g=1;$g<=6;$g++): ?>
+                                <option value="<?php echo $g; ?>" <?php if(isset($_GET['filter_grade']) && $_GET['filter_grade']==$g) echo 'selected'; ?>>Grade <?php echo $g; ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="filter_semester"><i class="fas fa-calendar-alt"></i> Semester</label>
+                        <select class="form-select" name="filter_semester" id="filter_semester" onchange="updateClassList()">
+                            <option value="">All Semesters</option>
+                            <option value="1st Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='1st Quarter') echo 'selected'; ?>>1st Quarter</option>
+                            <option value="2nd Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='2nd Quarter') echo 'selected'; ?>>2nd Quarter</option>
+                            <option value="3rd Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='3rd Quarter') echo 'selected'; ?>>3rd Quarter</option>
+                            <option value="4th Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='4th Quarter') echo 'selected'; ?>>4th Quarter</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label class="form-label" for="class_select"><i class="fas fa-graduation-cap"></i> Class</label>
+                        <select class="form-select" name="class_select" id="class_select" onchange="if(this.value) loadClassStudents(this.value)">
+                            <option value="">Select a Class</option>
+                            <?php 
+                            // Re-run the query to get classes since the previous result may be exhausted
+                            $filter_grade = isset($_GET['filter_grade']) ? $_GET['filter_grade'] : '';
+                            $filter_semester = isset($_GET['filter_semester']) ? $_GET['filter_semester'] : '';
+                            $class_query = "SELECT c.Class_ID, cl.Grade_Level, cl.School_Year, cl.Term, cr.Room, cr.Section FROM Class c JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID JOIN Classroom cr ON c.Room_ID = cr.Room_ID WHERE cl.School_Year = ? AND c.Class_ID IN (SELECT DISTINCT Class_ID FROM Enrollment)";
+                            $params = [$selected_year];
+                            $types = "s";
+                            if($filter_grade) { $class_query .= " AND cl.Grade_Level = ?"; $params[] = $filter_grade; $types .= "i"; }
+                            if($filter_semester) { $class_query .= " AND cl.Term = ?"; $params[] = $filter_semester; $types .= "s"; }
+                            $class_query .= " ORDER BY cl.Grade_Level, cr.Room";
+                            $stmt = $conn->prepare($class_query);
+                            $stmt->bind_param($types, ...$params);
+                            $stmt->execute();
+                            $classes_result = $stmt->get_result();
+                            while($class = $classes_result->fetch_assoc()): 
+                                $gradeClass = 'grade-level-' . (int)$class['Grade_Level'];
+                            ?>
+                                <option value="<?php echo $class['Class_ID']; ?>" class="<?php echo $gradeClass; ?>">
+                                    Grade <?php echo $class['Grade_Level']; ?> - <?php echo htmlspecialchars($class['Section']); ?> (Room <?php echo htmlspecialchars($class['Room']); ?>, <?php echo htmlspecialchars($class['Term']); ?>)
+                                </option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
                 </div>
-            </div>
+            </form>
+            <script>
+            function updateClassList() {
+                const grade = document.getElementById('filter_grade').value;
+                const semester = document.getElementById('filter_semester').value;
+                const params = new URLSearchParams(window.location.search);
+                params.set('filter_grade', grade);
+                params.set('filter_semester', semester);
+                window.location.search = params.toString();
+            }
+            </script>
         </section>
         
         <!-- Grade Entry Form -->
@@ -405,16 +492,13 @@ $classes_result = $stmt->get_result();
         function loadClassStudents(classId) {
             // Reset form first
             resetGradeForm();
-            
             document.getElementById('class_id').value = classId;
-            
             // Load students for this class
             fetch('adminRecord.php?action=get_students&class_id=' + classId)
                 .then(response => response.json())
                 .then(data => {
                     const studentSelect = document.getElementById('student_id');
                     studentSelect.innerHTML = '<option value="">Select a Student</option>';
-                    
                     if (data.success) {
                         data.students.forEach(student => {
                             studentSelect.innerHTML += `<option value="${student.Student_ID}">${student.Given_Name} ${student.Last_Name}</option>`;
@@ -428,14 +512,12 @@ $classes_result = $stmt->get_result();
                     console.error('Error loading students:', error);
                     alert('Error loading students. Please try again.');
                 });
-            
             // Load subjects for this class
             fetch('adminRecord.php?action=get_subjects&class_id=' + classId)
                 .then(response => response.json())
                 .then(data => {
                     const subjectSelect = document.getElementById('subject_id');
                     subjectSelect.innerHTML = '<option value="">Select a Subject</option>';
-                    
                     if (data.success) {
                         data.subjects.forEach(subject => {
                             subjectSelect.innerHTML += `<option value="${subject.Subject_ID}">${subject.Subject_Name}</option>`;
@@ -449,14 +531,20 @@ $classes_result = $stmt->get_result();
                     console.error('Error loading subjects:', error);
                     alert('Error loading subjects. Please try again.');
                 });
-            
             // Load existing grades for this class
             loadClassGrades(classId);
-            
             // Show forms
             document.getElementById('grade-form-section').style.display = 'block';
             document.getElementById('grades-table-section').style.display = 'block';
         }
+
+        // Automatically load students/subjects/grades if a class is pre-selected
+        document.addEventListener('DOMContentLoaded', function() {
+            var classSelect = document.getElementById('class_select');
+            if (classSelect && classSelect.value) {
+                loadClassStudents(classSelect.value);
+            }
+        });
         
         function loadClassGrades(classId) {
             fetch('adminRecord.php?action=get_grades&class_id=' + classId)

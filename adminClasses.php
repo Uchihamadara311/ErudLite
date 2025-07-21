@@ -51,49 +51,60 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     } else { // Add or Edit operation
-        $clearance_id = (int)$_POST['clearance_id'];
+        $grade_level = (int)$_POST['grade_level'];
         $room_id = (int)$_POST['room_id'];
+        $currentYear = date('Y');
+        $nextYear = $currentYear + 1;
+        $school_year = $currentYear . '-' . $nextYear;
 
-        if ($operation == 'edit' && $class_id > 0) {
-            // Check for existing class (prevent duplicate room assignment for the same clearance)
-            $check_sql = "SELECT Class_ID FROM Class WHERE Clearance_ID = ? AND Room_ID = ? AND Class_ID != ?";
-            $stmt = $conn->prepare($check_sql);
-            $stmt->bind_param("iii", $clearance_id, $room_id, $class_id);
-            $stmt->execute();
-
-            if ($stmt->get_result()->num_rows > 0) {
-                $error_message = "A class already exists for this grade level and room.";
-            } else {
-                // Update existing class
-                $sql = "UPDATE Class SET Clearance_ID = ?, Room_ID = ? WHERE Class_ID = ?";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("iii", $clearance_id, $room_id, $class_id);
-                if ($stmt->execute()) {
-                    $success_message = "Class updated successfully!";
-                } else {
-                    $error_message = "Error updating class: " . $stmt->error;
+        // Auto-generate clearances for all grade levels and terms if not present for the new school year
+        $terms = ['1st Semester', '2nd Semester', '3rd Semester', '4th Semester'];
+        for ($g = 1; $g <= 6; $g++) {
+            foreach ($terms as $t) {
+                $check_sql = "SELECT Clearance_ID FROM Clearance WHERE Grade_Level = ? AND School_Year = ? AND Term = ? LIMIT 1";
+                $stmt = $conn->prepare($check_sql);
+                $stmt->bind_param("iss", $g, $school_year, $t);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if (!$result->fetch_assoc()) {
+                    $insert_sql = "INSERT INTO Clearance (Grade_Level, School_Year, Term) VALUES (?, ?, ?)";
+                    $stmt = $conn->prepare($insert_sql);
+                    $stmt->bind_param("iss", $g, $school_year, $t);
+                    $stmt->execute();
                 }
             }
-        } else { // Add new class
-            // Check if class already exists for this clearance and room
-            $check_sql = "SELECT Class_ID FROM Class WHERE Clearance_ID = ? AND Room_ID = ?";
-            $stmt = $conn->prepare($check_sql);
-            $stmt->bind_param("ii", $clearance_id, $room_id);
-            $stmt->execute();
+        }
 
-            if ($stmt->get_result()->num_rows > 0) {
-                $error_message = "A class already exists for this grade level and room.";
-            } else {
-                // Insert new class
-                $sql = "INSERT INTO Class (Clearance_ID, Room_ID) VALUES (?, ?)";
-                $stmt = $conn->prepare($sql);
+        // Add new class for all 4 semesters for selected grade level and room
+        $created_count = 0;
+        foreach ($terms as $t) {
+            $find_clearance_sql = "SELECT Clearance_ID FROM Clearance WHERE Grade_Level = ? AND School_Year = ? AND Term = ? LIMIT 1";
+            $stmt = $conn->prepare($find_clearance_sql);
+            $stmt->bind_param("iss", $grade_level, $school_year, $t);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_assoc()) {
+                $clearance_id = $row['Clearance_ID'];
+                // Check if class already exists for this clearance and room
+                $check_sql = "SELECT Class_ID FROM Class WHERE Clearance_ID = ? AND Room_ID = ?";
+                $stmt = $conn->prepare($check_sql);
                 $stmt->bind_param("ii", $clearance_id, $room_id);
-                if ($stmt->execute()) {
-                    $success_message = "Class created successfully!";
-                } else {
-                    $error_message = "Error creating class: " . $stmt->error;
+                $stmt->execute();
+                if ($stmt->get_result()->num_rows == 0) {
+                    // Insert new class
+                    $sql = "INSERT INTO Class (Clearance_ID, Room_ID) VALUES (?, ?)";
+                    $stmt = $conn->prepare($sql);
+                    $stmt->bind_param("ii", $clearance_id, $room_id);
+                    if ($stmt->execute()) {
+                        $created_count++;
+                    }
                 }
             }
+        }
+        if ($created_count > 0) {
+            $success_message = "$created_count classes created for all semesters!";
+        } else {
+            $error_message = "Classes already exist for all semesters for this grade level and room.";
         }
     }
 }
@@ -116,7 +127,7 @@ $classes_sql = "SELECT c.Class_ID, cl.Clearance_ID, cl.Grade_Level, cl.School_Ye
                 LEFT JOIN Enrollment e ON c.Class_ID = e.Class_ID AND e.Status = 'Active'
                 GROUP BY c.Class_ID, cl.Clearance_ID, cl.Grade_Level, cl.School_Year, cl.Term,
                          cr.Room_ID, cr.Room, cr.Section, cr.Floor_No
-                ORDER BY cl.School_Year DESC, cl.Grade_Level, cr.Room";
+                ORDER BY cl.School_Year, cl.Grade_Level, cl.Term ASC, cr.Room";
 $classes_data_result = $conn->query($classes_sql);
 
 ?>
@@ -153,21 +164,15 @@ $classes_data_result = $conn->query($classes_sql);
                 <input type="hidden" id="class_id" name="class_id" value="">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label class="form-label" for="clearance_id"><i class="fas fa-graduation-cap"></i> Grade Level & School Year *</label>
-                        <select class="form-select" name="clearance_id" id="clearance_id" required>
+                        <label class="form-label" for="grade_level"><i class="fas fa-graduation-cap"></i> Grade Level & School Year *</label>
+                        <select class="form-select" name="grade_level" id="grade_level" required>
                             <option value="">Select Grade Level</option>
                             <?php
-                            // Reset clearance result pointer if it's already been fetched once
-                            if ($clearances_result) {
-                                $clearances_result->data_seek(0);
-                            }
-                            if ($clearances_result && $clearances_result->num_rows > 0) {
-                                while($clearance = $clearances_result->fetch_assoc()) {
-                                    echo "<option value='" . $clearance['Clearance_ID'] . "'>" .
-                                         "Grade " . htmlspecialchars($clearance['Grade_Level']) . " - " .
-                                         htmlspecialchars($clearance['School_Year']) . " (" .
-                                         htmlspecialchars($clearance['Term']) . ")</option>";
-                                }
+                            $currentYear = date('Y');
+                            $nextYear = $currentYear + 1;
+                            $currentSchoolYear = $currentYear . '-' . $nextYear;
+                            for ($g = 1; $g <= 6; $g++) {
+                                echo "<option value='$g'>Grade $g - $currentSchoolYear</option>";
                             }
                             ?>
                         </select>
@@ -234,18 +239,22 @@ $classes_data_result = $conn->query($classes_sql);
                         if ($classes_data_result && $classes_data_result->num_rows > 0) {
                             while($row = $classes_data_result->fetch_assoc()) {
                                 $gradeLevel = htmlspecialchars($row['Grade_Level']);
-                                echo "<tr class='clickable-row'>"; // Removed onclick here as it's better handled by separate buttons
+                                $schoolYear = htmlspecialchars($row['School_Year']);
+                                $term = htmlspecialchars($row['Term']);
+                                $room = htmlspecialchars($row['Room']);
+                                $section = htmlspecialchars($row['Section']);
+                                $studentCount = (int)$row['student_count'];
+                                $classId = (int)$row['Class_ID'];
+                                $clearanceId = (int)$row['Clearance_ID'];
+                                $roomId = (int)$row['Room_ID'];
+                                echo "<tr>";
                                 echo "<td><span class='grade-badge grade-level-{$gradeLevel}'><i class='fas fa-graduation-cap'></i> Grade {$gradeLevel}</span></td>";
-                                echo "<td>" . htmlspecialchars($row['School_Year']) . " (" . htmlspecialchars($row['Term']) . ")</td>";
-                                echo "<td><i class='fas fa-door-open'></i> Room " . htmlspecialchars($row['Room']) . " - " . htmlspecialchars($row['Section']) . "</td>";
-                                echo "<td><span class='role-badge student'><i class='fas fa-users'></i> " . $row['student_count'] . " students</span></td>";
+                                echo "<td>{$schoolYear} <span class='term-badge'>({$term})</span></td>";
+                                echo "<td><i class='fas fa-door-open'></i> Room {$room} - {$section}</td>";
+                                echo "<td><span class='role-badge student'><i class='fas fa-users'></i> {$studentCount} students</span></td>";
                                 echo "<td class='action-buttons'>";
-                                echo "<button class='edit-btn' onclick='editClass(" .
-                                     $row['Class_ID'] . ", " .
-                                     $row['Clearance_ID'] . ", " .
-                                     $row['Room_ID'] . ")'><i class='fas fa-edit'></i> Edit</button>";
-                                echo "<button class='delete-btn' onclick='deleteClass(" .
-                                     $row['Class_ID'] . ")'><i class='fas fa-trash-alt'></i> Delete</button>";
+                                echo "<button class='edit-btn' onclick='editClass({$classId}, {$clearanceId}, {$roomId})'><i class='fas fa-edit'></i> Edit</button>";
+                                echo "<button class='delete-btn' onclick='deleteClass({$classId})'><i class='fas fa-trash-alt'></i> Delete</button>";
                                 echo "</td>";
                                 echo "</tr>";
                             }
@@ -316,4 +325,3 @@ $classes_data_result = $conn->query($classes_sql);
     </script>
 </body>
 </html>
-```

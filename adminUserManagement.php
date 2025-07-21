@@ -85,10 +85,20 @@ function addUser($conn, $userData) {
             $instructor_stmt->execute();
         }
         
+        // If user is a student, add to Student table
+        if ($userData['permissions'] == 'Student') {
+            $student_sql = "INSERT INTO Student (Profile_ID) VALUES (?)";
+            $student_stmt = $conn->prepare($student_sql);
+            $student_stmt->bind_param("i", $profile_id);
+            $student_stmt->execute();
+        }
         $conn->commit();
         return "User added successfully!";
     } catch (Exception $e) {
         $conn->rollback();
+        if (strpos($e->getMessage(), 'a foreign key constraint fails') !== false) {
+            return "Error: Cannot delete user because this user is still enrolled in or associated with a school record. Please remove or update related school records first.";
+        }
         return "Error: " . $e->getMessage();
     }
 }
@@ -144,6 +154,27 @@ function updateUser($conn, $user_id, $userData) {
         }
         
         // Handle Instructor specialization
+        if ($userData['permissions'] == 'Student') {
+            // Check if student record exists
+            $check_sql = "SELECT * FROM Student WHERE Profile_ID = ?";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("i", $user_id);
+            $check_stmt->execute();
+            $result = $check_stmt->get_result();
+            if ($result->num_rows == 0) {
+                // Create new student
+                $student_sql = "INSERT INTO Student (Profile_ID) VALUES (?)";
+                $student_stmt = $conn->prepare($student_sql);
+                $student_stmt->bind_param("i", $user_id);
+                $student_stmt->execute();
+            }
+        } else {
+            // Remove from student table if role changed
+            $remove_sql = "DELETE FROM Student WHERE Profile_ID = ?";
+            $remove_stmt = $conn->prepare($remove_sql);
+            $remove_stmt->bind_param("i", $user_id);
+            $remove_stmt->execute();
+        }
         if ($userData['permissions'] == 'Instructor') {
             // Check if instructor record exists
             $check_sql = "SELECT * FROM Instructor WHERE Profile_ID = ?";
@@ -191,6 +222,11 @@ function deleteUser($conn, $user_id) {
         $instructor_stmt = $conn->prepare($instructor_sql);
         $instructor_stmt->bind_param("i", $user_id);
         $instructor_stmt->execute();
+        // Delete student record if exists
+        $student_sql = "DELETE FROM Student WHERE Profile_ID = ?";
+        $student_stmt = $conn->prepare($student_sql);
+        $student_stmt->bind_param("i", $user_id);
+        $student_stmt->execute();
         
         // Delete account and related records
         $account_sql = "DELETE FROM Account WHERE Profile_ID = ?";

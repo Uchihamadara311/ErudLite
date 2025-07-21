@@ -1,3 +1,13 @@
+/* Ensure grades table stays wide and scrollable */
+#grades-table {
+    min-width: 900px;
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.table-container {
+    overflow-x: auto;
+}
 /* Admin Management Styles (Shared for Users and Subjects) */
 .admin-container {
     max-width: 1200px;
@@ -255,68 +265,61 @@ body:has([id*="users-table"]) .form-title::before {
 }
 
 /* Table Styles */
-.table-section {
-    background: var(--background-white);
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    overflow: hidden;
-    border: 1px solid #dee2e6;
-    margin-bottom: 30px;
-}
-
+/* Responsive and flexible table styles */
 .table-container {
-    background: white;
-    border-radius: 0 0 8px 8px;
-    overflow: hidden;
+    width: 100%;
+    overflow-x: auto;
 }
-
-.data-table {
+#classes-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95rem;
-    table-layout: fixed;
-    min-width: 800px;
+    table-layout: auto;
 }
-
-.data-table th {
-    color: #212529;
-    font-weight: 600;
-    text-transform: none;
-    font-size: 1rem;
-    padding: 15px 20px;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
+#classes-table th, #classes-table td {
+    padding: 8px 10px;
     text-align: left;
-    white-space: nowrap;
-}
-
-.data-table th i {
-    color: #212529;
-    margin-right: 8px;
-    opacity: 0.7;
-}
-
-.data-table td {
-    color: #212529;
-    padding: 15px 20px;
     vertical-align: middle;
-    border-bottom: 1px solid #dee2e6;
-    text-align: left;
-    white-space: nowrap;
-    overflow: visible;
-    text-overflow: ellipsis;
-}
-
-.data-table td:nth-child(2) {
-    white-space: normal;
     word-break: break-word;
 }
-
-/* Action column should not be constrained */
-.data-table td:nth-child(4),
-.data-table td:nth-child(5) {
+#classes-table th {
+    background: #f7f7f7;
+}
+.role-badge.student {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    overflow: visible;
+}
+.action-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.action-buttons button {
+    min-width: 40px;
+    padding: 4px 8px;
+    font-size: 0.95em;
+    white-space: nowrap;
+}
+@media (max-width: 900px) {
+    #classes-table th, #classes-table td {
+        font-size: 0.95em;
+        padding: 6px 6px;
+    }
+    .action-buttons {
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+@media (max-width: 600px) {
+    #classes-table th, #classes-table td {
+        font-size: 0.9em;
+        padding: 4px 2px;
+    }
+    .table-container {
+        padding: 0;
+    }
 }
 
 .data-table tr:hover {

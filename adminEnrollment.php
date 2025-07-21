@@ -137,6 +137,7 @@ $classes_sql = "SELECT c.Class_ID, cl.Grade_Level, cl.School_Year, cl.Term, cr.R
                 LEFT JOIN Enrollment e ON c.Class_ID = e.Class_ID AND e.Status = 'Active'
                 WHERE cl.School_Year = ?
                 GROUP BY c.Class_ID, cl.Grade_Level, cl.School_Year, cl.Term, cr.Room, cr.Section
+                HAVING COUNT(e.Student_ID) >= 0
                 ORDER BY cl.Grade_Level, cr.Room";
 $stmt_classes = $conn->prepare($classes_sql);
 if(!$stmt_classes) { die("Prepare failed for classes: " . $conn->error); }
@@ -233,28 +234,22 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
         <section class="form-section">
             <h2 class="form-title" id="form-title"><i class="fas fa-user-plus"></i> Enroll Student in Class</h2>
             <form method="POST" action="adminEnrollment.php?year=<?php echo urlencode($selected_year); ?>" id="enrollment-form">
-                <div class="search-wrapper">
-                    <i class="fas fa-search search-icon"></i>
-                    <!-- Search student by ID: -->
-                    <input type="text" id="" class="search-input" placeholder="Search Student ID...">
-                    <span id="selected-student-id" style="margin-left:10px; font-weight:bold;"></span>
-                    <script>
-                        // Display selected student ID when a student is chosen
-                        document.addEventListener('DOMContentLoaded', function() {
-                            var studentSelect = document.getElementById('student_id');
-                            var displaySpan = document.getElementById('selected-student-id');
-                            studentSelect.addEventListener('change', function() {
-                                var selectedOption = studentSelect.options[studentSelect.selectedIndex];
-                                var studentId = selectedOption.value;
-                                displaySpan.textContent = studentId ? "Student ID: " + studentId : "";
-                            });
-                        });
-                    </script>
-                </div>
                 <input type="hidden" id="operation" name="operation" value="enroll">
                 <input type="hidden" name="year" value="<?php echo htmlspecialchars($selected_year); ?>">
                 <input type="hidden" id="original_class_id" name="original_class_id" value="">
                 <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="grade_level"><i class="fas fa-graduation-cap"></i> Grade Level</label>
+                        <select class="form-select" name="grade_level" id="grade_level">
+                            <option value="">All Grades</option>
+                            <option value="1">Grade 1</option>
+                            <option value="2">Grade 2</option>
+                            <option value="3">Grade 3</option>
+                            <option value="4">Grade 4</option>
+                            <option value="5">Grade 5</option>
+                            <option value="6">Grade 6</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label class="form-label" for="class_id"><i class="fas fa-school"></i> Select Class *</label>
                         <select class="form-select" name="class_id" id="class_id" required>
@@ -262,20 +257,32 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                             <?php
                             // Reset pointer to beginning of results
                             $classes_result->data_seek(0);
+                            $class_options = [];
                             if ($classes_result && $classes_result->num_rows > 0) {
                                 while($class = $classes_result->fetch_assoc()) {
-                                    echo "<option value='" . $class['Class_ID'] . "'>" .
-                                          "Grade " . $class['Grade_Level'] . " - " .
-                                          htmlspecialchars($class['Section']) . " (Room " .
-                                          htmlspecialchars($class['Room']) . ") - " .
-                                         $class['enrolled_count'] . " students enrolled</option>";
+                                    $option = [
+                                        'id' => $class['Class_ID'],
+                                        'grade' => $class['Grade_Level'],
+                                        'section' => htmlspecialchars($class['Section']),
+                                        'room' => htmlspecialchars($class['Room']),
+                                        'enrolled' => $class['enrolled_count'],
+                                        'term' => $class['Term']
+                                    ];
+                                    $class_options[] = $option;
                                 }
+                            }
+                            foreach ($class_options as $class) {
+                                echo "<option value='" . $class['id'] . "' data-term='" . $class['term'] . "'>" .
+                                    "Grade " . $class['grade'] . " - " . $class['section'] . " (Room " . $class['room'] . ") - " .
+                                    $class['enrolled'] . " students enrolled [" . $class['term'] . "]</option>";
                             }
                             ?>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="student_id"><i class="fas fa-user"></i> Select Student *</label>
+                        <input type="text" class="form-control" id="studentSearch" placeholder="Search by ID or Name..." style="margin-bottom:8px;" autocomplete="off">
+                        <div id="studentSuggestions" class="suggestion-list" style="position:relative;z-index:10;"></div>
                         <select class="form-select" name="student_id" id="student_id" required>
                             <option value="">Select a Student</option>
                             <?php
@@ -289,13 +296,23 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                             ?>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="form-label" for="term"><i class="fas fa-calendar-alt"></i> Semester *</label>
+                        <select class="form-select" name="term" id="term" required>
+                            <option value="">Select Semester</option>
+                            <option value="1st Semester">1st Semester</option>
+                            <option value="2nd Semester">2nd Semester</option>
+                            <option value="3rd Semester">3rd Semester</option>
+                            <option value="4th Semester">4th Semester</option>
+                        </select>
+                    </div>
                 </div>
                                 <div class="button-group">
                     <button type="submit" class="submit-btn" id="submit-btn"><i class="fas fa-user-plus"></i> Enroll Student</button>
-                    <button type="button" class="delete-btn" id="unenroll-btn" style="display: none;"><i class="fas fa-user-minus"></i> Unenroll</button>
                     <button type="button" class="cancel-btn" id="cancel-btn" style="display: none;" onclick="resetForm()">
                         <i class="fas fa-times"></i> Cancel
                     </button>
+                    <button type="button" class="delete-btn" id="unenroll-btn" style="display: none;"><i class="fas fa-user-minus"></i> Unenroll</button>
                 </div>
             </form>
         </section>                <section class="table-section">
@@ -354,6 +371,83 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
     <script>
+        function filterClassList() {
+            var selectedTerm = document.getElementById('term').value;
+            var selectedGrade = document.getElementById('grade_level').value;
+            var classSelect = document.getElementById('class_id');
+            Array.from(classSelect.options).forEach(function(option) {
+                if (!option.value) return; // skip placeholder
+                var matchesTerm = (selectedTerm === '' || option.getAttribute('data-term') === selectedTerm);
+                var matchesGrade = (selectedGrade === '' || option.textContent.indexOf('Grade ' + selectedGrade + ' ') !== -1);
+                if (matchesTerm && matchesGrade) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+            // Reset selection if current selected class is hidden
+            if (classSelect.selectedIndex > 0 && classSelect.options[classSelect.selectedIndex].style.display === 'none') {
+                classSelect.selectedIndex = 0;
+            }
+        }
+        document.getElementById('term').addEventListener('change', filterClassList);
+        document.getElementById('grade_level').addEventListener('change', filterClassList);
+
+        // Student search autosuggest
+        const studentSearch = document.getElementById('studentSearch');
+        const studentSelect = document.getElementById('student_id');
+        const suggestionBox = document.getElementById('studentSuggestions');
+
+        studentSearch.addEventListener('input', function() {
+            var filter = this.value.toLowerCase();
+            suggestionBox.innerHTML = '';
+            if (!filter) {
+                Array.from(studentSelect.options).forEach(function(option) {
+                    option.hidden = false;
+                });
+                return;
+            }
+            var matches = [];
+            Array.from(studentSelect.options).forEach(function(option) {
+                if (!option.value) return;
+                var text = option.textContent.toLowerCase();
+                option.hidden = (text.indexOf(filter) === -1);
+                if (text.indexOf(filter) !== -1) {
+                    matches.push({value: option.value, label: option.textContent});
+                }
+            });
+            if (matches.length > 0) {
+                var list = document.createElement('ul');
+                list.style.position = 'absolute';
+                list.style.background = '#fff';
+                list.style.border = '1px solid #ccc';
+                list.style.width = studentSearch.offsetWidth + 'px';
+                list.style.listStyle = 'none';
+                list.style.margin = 0;
+                list.style.padding = '2px 0';
+                list.style.maxHeight = '180px';
+                list.style.overflowY = 'auto';
+                matches.forEach(function(match) {
+                    var item = document.createElement('li');
+                    item.textContent = match.label;
+                    item.style.padding = '4px 8px';
+                    item.style.cursor = 'pointer';
+                    item.addEventListener('mousedown', function(e) {
+                        studentSelect.value = match.value;
+                        studentSearch.value = match.label;
+                        suggestionBox.innerHTML = '';
+                        // Optionally trigger change event
+                        studentSelect.dispatchEvent(new Event('change'));
+                    });
+                    list.appendChild(item);
+                });
+                suggestionBox.appendChild(list);
+            }
+        });
+        // Hide suggestions on blur
+        studentSearch.addEventListener('blur', function() {
+            setTimeout(function() { suggestionBox.innerHTML = ''; }, 150);
+        });
         function resetForm() {
             document.getElementById('form-title').innerHTML = '<i class="fas fa-user-plus"></i> Enroll Student in Class';
             document.getElementById('submit-btn').innerHTML = '<i class="fas fa-user-plus"></i> Enroll Student';
@@ -370,6 +464,8 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
             if (hiddenStudentInput) {
                 hiddenStudentInput.remove();
             }
+            // Reset class filter
+            filterClassList();
         }
 
         function editEnrollment(classId, studentId, studentName) {
