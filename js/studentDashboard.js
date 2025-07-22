@@ -1,3 +1,3 @@
 document.getElementById("basicInfo").onclick = function() {
-    window.location.href = "studentAcademicStats.html";
+    window.location.href = "studentAcademicStats.php";
 }
