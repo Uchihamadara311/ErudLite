@@ -13,16 +13,19 @@ if (isset($_GET['action'])) {
     header('Content-Type: application/json');
     
     if ($_GET['action'] == 'get_students' && isset($_GET['class_id'])) {
-        // AJAX handler: Get students enrolled in the selected class
-        // Uses Enrollment table to find students for the given Class_ID
+        // AJAX handler: Get students enrolled in the selected class (by class_id)
+        // Uses Enrollment and Class tables to find students for the given Class_ID
+        // SQL: Selects students who are enrolled in the specified class, joining with Profile, Profile_Bio, and Classroom for names and room info
         try {
             $class_id = (int)$_GET['class_id'];
-            $sql = "SELECT DISTINCT s.Student_ID, pb.Given_Name, pb.Last_Name 
+            $sql = "SELECT DISTINCT s.Student_ID, pb.Given_Name, pb.Last_Name, cr.Room
                     FROM Student s
                     JOIN Profile p ON s.Profile_ID = p.Profile_ID
                     JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
                     JOIN Enrollment e ON s.Student_ID = e.Student_ID
-                    WHERE e.Class_ID = ?
+                    JOIN Class c ON e.Class_ID = c.Class_ID
+                    JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                    WHERE c.Class_ID = ? AND e.Status = 'Active'
                     ORDER BY pb.Last_Name, pb.Given_Name";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $class_id);
@@ -41,14 +44,16 @@ if (isset($_GET['action'])) {
     
     if ($_GET['action'] == 'get_subjects' && isset($_GET['class_id'])) {
         // AJAX handler: Get subjects assigned to the selected class
-        // Uses Assigned_Subject table to find subjects for the given Class_ID
-        // This ensures subjects are shown even if Subject.Clearance_ID does not match Class.Clearance_ID
+        // Uses Schedule table to find subjects for the given Class_ID
+        // SQL: Selects subjects assigned to the class via Schedule, joining with Subject for names
         try {
             $class_id = (int)$_GET['class_id'];
-            $sql = "SELECT DISTINCT s.Subject_ID, s.Subject_Name 
-                    FROM Assigned_Subject asub
-                    JOIN Subject s ON asub.Subject_ID = s.Subject_ID
-                    WHERE asub.Class_ID = ?
+            $sql = "SELECT s.Subject_ID, s.Subject_Name
+                    FROM Clearance clr
+                    JOIN Class c ON clr.Clearance_ID = c.Clearance_ID
+                    JOIN Schedule sch ON c.Class_ID = sch.Class_ID
+                    JOIN Subject s ON sch.Subject_ID = s.Subject_ID
+                    WHERE c.Class_ID = ?
                     ORDER BY s.Subject_Name";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $class_id);
@@ -66,6 +71,8 @@ if (isset($_GET['action'])) {
     }
     
     if ($_GET['action'] == 'get_grades' && isset($_GET['class_id'])) {
+        // AJAX handler: Get grades for all students in the selected class
+        // SQL: Selects grade records for students in the class, joining with student, subject, clearance, and profile tables for details
         $class_id = (int)$_GET['class_id'];
         $sql = "SELECT rd.Record_ID as Grade_ID, rd.Grade as Grade_Value, 
                        r.Student_ID, pb.Given_Name, pb.Last_Name, s.Subject_Name, cl.Term as Quarter, rd.Record_Date as Date_Recorded,
@@ -86,7 +93,7 @@ if (isset($_GET['action'])) {
         $result = $stmt->get_result();
         $grades = [];
         while($row = $result->fetch_assoc()) {
-            $row['Grade_Letter'] = calculateLetterGrade($row['Grade_Value']);
+            $row['Grade_Letter'] = calculateLetterGrade($row['Grade_Value']); // Add letter grade for display
             $grades[] = $row;
         }
         echo json_encode($grades);
@@ -94,9 +101,10 @@ if (isset($_GET['action'])) {
     }
     
     if ($_GET['action'] == 'search_student' && isset($_GET['query'])) {
+        // AJAX handler: Search for students by name in the selected academic year
+        // SQL: Selects students whose first or last name matches the query, and who are enrolled in the selected year
         $query = '%' . $_GET['query'] . '%';
         $selected_year = isset($_GET['year']) ? $_GET['year'] : date('Y') . '-' . (date('Y') + 1);
-        
         $sql = "SELECT DISTINCT s.Student_ID, pb.Given_Name, pb.Last_Name,
                        cl.Grade_Level, cr.Section, cr.Room
                 FROM Student s
@@ -113,7 +121,6 @@ if (isset($_GET['action'])) {
         $stmt->bind_param("sss", $query, $query, $selected_year);
         $stmt->execute();
         $result = $stmt->get_result();
-        
         $html = '<div class="search-results">';
         if ($result->num_rows > 0) {
             while($student = $result->fetch_assoc()) {
@@ -126,12 +133,13 @@ if (isset($_GET['action'])) {
             $html .= '<p>No students found matching your search.</p>';
         }
         $html .= '</div>';
-        
         echo json_encode(['html' => $html]);
         exit;
     }
     
     if ($_GET['action'] == 'get_student_grades' && isset($_GET['student_id'])) {
+        // AJAX handler: Get all grades for a specific student
+        // SQL: Selects all grade records for the student, joining with subject, clearance, and profile tables for details
         $student_id = (int)$_GET['student_id'];
         $sql = "SELECT rd.Record_ID as Grade_ID, rd.Grade as Grade_Value, 
                        r.Student_ID, pb.Given_Name, pb.Last_Name, s.Subject_Name, cl.Term as Quarter, rd.Record_Date as Date_Recorded,
@@ -151,7 +159,7 @@ if (isset($_GET['action'])) {
         $result = $stmt->get_result();
         $grades = [];
         while($row = $result->fetch_assoc()) {
-            $row['Grade_Letter'] = calculateLetterGrade($row['Grade_Value']);
+            $row['Grade_Letter'] = calculateLetterGrade($row['Grade_Value']); // Add letter grade for display
             $grades[] = $row;
         }
         echo json_encode($grades);
@@ -185,17 +193,19 @@ function calculateLetterGrade($grade_value) {
 if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $operation = isset($_POST['operation']) ? $_POST['operation'] : 'add_grade';
     if ($operation == 'add_grade') {
+        // Add a new grade record for a student
         $student_id = (int)$_POST['student_id'];
         $subject_id = (int)$_POST['subject_id'];
         $class_id = (int)$_POST['class_id'];
-        $term = cleanInput($_POST['quarter']); // Renamed for consistency
+        $semester = cleanInput($_POST['semester']); // Renamed for consistency
         $grade_value = (float)$_POST['grade_value'];
         $grade_letter = calculateLetterGrade($grade_value);
 
         // Get Clearance_ID for this class and term
+        // SQL: Find the clearance for the class and term to associate the grade
         $clearance_sql = "SELECT cl.Clearance_ID FROM Class c JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID WHERE c.Class_ID = ? AND cl.Term = ?";
         $stmt = $conn->prepare($clearance_sql);
-        $stmt->bind_param("is", $class_id, $term);
+        $stmt->bind_param("is", $class_id, $semester);
         $stmt->execute();
         $result = $stmt->get_result();
         if ($row = $result->fetch_assoc()) {
@@ -206,7 +216,23 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         // Check if record already exists for this student, subject, instructor, and clearance
-        $instructor_id = 1; // You may want to set this dynamically
+        // SQL: Prevents duplicate grade entries for the same student, subject, instructor, and quarter
+        // Get instructor ID from session (assuming instructor is logged in as admin)
+        $instructor_id = isset($_SESSION['instructor_id']) ? (int)$_SESSION['instructor_id'] : 0;
+        // Get instructor ID for the selected class and subject
+        $instructor_id = 0;
+        $instructor_sql = "SELECT Instructor_ID FROM Schedule WHERE Class_ID = ? AND Subject_ID = ? LIMIT 1";
+        $stmt = $conn->prepare($instructor_sql);
+        $stmt->bind_param("ii", $class_id, $subject_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($row = $result->fetch_assoc()) {
+            $instructor_id = (int)$row['Instructor_ID'];
+        }
+        if ($instructor_id === 0) {
+            $error_message = "Instructor not found for this class and subject.";
+            return;
+        }
         $check_sql = "SELECT rd.Record_ID FROM Record r JOIN Record_Details rd ON r.Record_ID = rd.Record_ID WHERE r.Student_ID = ? AND r.Subject_ID = ? AND r.Instructor_ID = ? AND rd.Clearance_ID = ?";
         $stmt = $conn->prepare($check_sql);
         $stmt->bind_param("iiii", $student_id, $subject_id, $instructor_id, $clearance_id);
@@ -216,12 +242,14 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error_message = "Grade already exists for this student, subject, and quarter.";
         } else {
             // Insert into Record
+            // SQL: Create a new record for the grade
             $sql = "INSERT INTO Record (Student_ID, Instructor_ID, Subject_ID) VALUES (?, ?, ?)";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("iii", $student_id, $instructor_id, $subject_id);
             if ($stmt->execute()) {
                 $record_id = $stmt->insert_id;
                 // Insert into Record_Details
+                // SQL: Add the grade details for the record
                 $sql = "INSERT INTO Record_Details (Record_ID, Clearance_ID, Grade, Record_Date) VALUES (?, ?, ?, CURDATE())";
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param("iii", $record_id, $clearance_id, $grade_value);
@@ -235,9 +263,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     } elseif ($operation == 'update_grade') {
+        // Update an existing grade record
         $record_id = (int)$_POST['grade_id'];
         $grade_value = (float)$_POST['grade_value'];
-        // Update Record_Details
+        // SQL: Update the grade value and date for the record
         $sql = "UPDATE Record_Details SET Grade = ?, Record_Date = CURDATE() WHERE Record_ID = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ii", $grade_value, $record_id);
@@ -247,8 +276,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error_message = "Error updating grade: " . $stmt->error;
         }
     } elseif ($operation == 'delete_grade') {
+        // Delete a grade record
         $record_id = (int)$_POST['grade_id'];
-        // Delete from Record_Details first
+        // SQL: Delete the grade details first, then the main record
         $sql = "DELETE FROM Record_Details WHERE Record_ID = ?";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("i", $record_id);
@@ -349,10 +379,10 @@ $classes_result = $stmt->get_result();
                         <label class="form-label" for="filter_semester"><i class="fas fa-calendar-alt"></i> Semester</label>
                         <select class="form-select" name="filter_semester" id="filter_semester" onchange="updateClassList()">
                             <option value="">All Semesters</option>
-                            <option value="1st Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='1st Quarter') echo 'selected'; ?>>1st Quarter</option>
-                            <option value="2nd Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='2nd Quarter') echo 'selected'; ?>>2nd Quarter</option>
-                            <option value="3rd Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='3rd Quarter') echo 'selected'; ?>>3rd Quarter</option>
-                            <option value="4th Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='4th Quarter') echo 'selected'; ?>>4th Quarter</option>
+                            <option value="1st Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='1st Quarter') echo 'selected'; ?>>1st Semester</option>
+                            <option value="2nd Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='2nd Quarter') echo 'selected'; ?>>2nd Semester</option>
+                            <option value="3rd Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='3rd Quarter') echo 'selected'; ?>>3rd Semester</option>
+                            <option value="4th Quarter" <?php if(isset($_GET['filter_semester']) && $_GET['filter_semester']=='4th Quarter') echo 'selected'; ?>>4th Semester</option>
                         </select>
                     </div>
                     <div class="form-group full-width">
@@ -419,13 +449,13 @@ $classes_result = $stmt->get_result();
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="quarter"><i class="fas fa-calendar"></i> Quarter *</label>
-                        <select class="form-select" name="quarter" id="quarter" required>
-                            <option value="">Select Quarter</option>
-                            <option value="1st Quarter">1st Quarter</option>
-                            <option value="2nd Quarter">2nd Quarter</option>
-                            <option value="3rd Quarter">3rd Quarter</option>
-                            <option value="4th Quarter">4th Quarter</option>
+                        <label class="form-label" for="semester"><i class="fas fa-calendar"></i> Semester *</label>
+                        <select class="form-select" name="semester" id="semester" required>
+                            <option value="">Select Semester</option>
+                            <option value="1st Semester">1st Semester</option>
+                            <option value="2nd Semester">2nd Semester</option>
+                            <option value="3rd Semester">3rd Semester</option>
+                            <option value="4th Semester">4th Semester</option>
                         </select>
                     </div>
                     
@@ -435,10 +465,10 @@ $classes_result = $stmt->get_result();
                     </div>
                 </div>
                 
-                <div class="button-group">
+                <div class="button-group" id="grade-form-buttons">
                     <button type="submit" class="submit-btn" id="submit-btn"><i class="fas fa-save"></i> Record Grade</button>
-                    <button type="button" class="cancel-btn" onclick="resetGradeForm()"><i class="fas fa-refresh"></i> Reset</button>
-                    <button type="button" class="cancel-btn" onclick="hideGradeForm()"><i class="fas fa-times"></i> Hide Form</button>
+                    <button type="button" class="cancel-btn" id="cancel-btn" onclick="resetGradeForm()"><i class="fas fa-refresh"></i> Cancel</button>
+                    <button type="button" class="delete-btn" id="delete-btn" style="display:none;" onclick="deleteGradeFromForm()"><i class="fas fa-trash"></i> Delete</button>
                 </div>
             </form>
         </section>
@@ -552,27 +582,44 @@ $classes_result = $stmt->get_result();
                 .then(grades => {
                     const tbody = document.getElementById('grades-tbody');
                     tbody.innerHTML = '';
-                    
                     if (grades.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="7" class="no-data"><i class="fas fa-info-circle"></i> No grades found for this class.</td></tr>';
                         return;
                     }
-                    
                     grades.forEach(grade => {
                         tbody.innerHTML += `
-                            <tr>
+                            <tr class="grade-row" data-grade-id="${grade.Grade_ID}" data-student-id="${grade.Student_ID}" data-subject-name="${grade.Subject_Name}" data-subject-id="${grade.Subject_ID || ''}" data-semester="${grade.Quarter}" data-grade-value="${grade.Grade_Value}">
                                 <td><i class="fas fa-user"></i> ${grade.Given_Name} ${grade.Last_Name}</td>
                                 <td>${grade.Subject_Name}</td>
                                 <td>${grade.Quarter}</td>
                                 <td>${grade.Grade_Value}</td>
                                 <td><span class="grade-badge">${grade.Grade_Letter}</span></td>
                                 <td>${grade.Date_Recorded}</td>
-                                <td class="action-buttons">
-                                    <button class="edit-btn" onclick="editGrade(${grade.Grade_ID}, ${grade.Grade_Value})"><i class="fas fa-edit"></i> Edit</button>
-                                    <button class="delete-btn" onclick="deleteGrade(${grade.Grade_ID})"><i class="fas fa-trash"></i> Delete</button>
-                                </td>
+                                <td class="action-buttons"></td>
                             </tr>
                         `;
+                    });
+                    document.querySelectorAll('.grade-row').forEach(row => {
+                        row.addEventListener('click', function(e) {
+                            if (e.target.closest('button')) return;
+                            document.getElementById('operation').value = 'update_grade';
+                            document.getElementById('grade_id').value = this.dataset.gradeId;
+                            document.getElementById('student_id').value = this.dataset.studentId;
+                            const subjectSelect = document.getElementById('subject_id');
+                            for (let i = 0; i < subjectSelect.options.length; i++) {
+                                if (subjectSelect.options[i].text === this.dataset.subjectName) {
+                                    subjectSelect.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                            document.getElementById('semester').value = this.dataset.semester;
+                            document.getElementById('grade_value').value = this.dataset.gradeValue;
+                            document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update Grade';
+                            document.getElementById('grade-form-title').innerHTML = '<i class="fas fa-edit"></i> Update Grade';
+                            document.getElementById('grade-form-section').style.display = 'block';
+                            document.getElementById('delete-btn').style.display = 'inline-block';
+                            document.getElementById('grade-form-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
                     });
                 })
                 .catch(error => {
@@ -588,11 +635,8 @@ $classes_result = $stmt->get_result();
             document.getElementById('grade_value').value = currentValue;
             document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Update Grade';
             document.getElementById('grade-form-title').innerHTML = '<i class="fas fa-edit"></i> Update Grade';
-            
-            // Show the form if it's hidden
             document.getElementById('grade-form-section').style.display = 'block';
-            
-            // Scroll to form
+            document.getElementById('delete-btn').style.display = 'inline-block';
             document.getElementById('grade-form-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
@@ -631,9 +675,10 @@ $classes_result = $stmt->get_result();
             document.getElementById('grade_value').value = '';
             document.getElementById('student_id').value = '';
             document.getElementById('subject_id').value = '';
-            document.getElementById('quarter').value = '';
+            document.getElementById('semester').value = '';
             document.getElementById('submit-btn').innerHTML = '<i class="fas fa-save"></i> Record Grade';
             document.getElementById('grade-form-title').innerHTML = '<i class="fas fa-edit"></i> Record Grade';
+            document.getElementById('delete-btn').style.display = 'none';
         }
         
         function searchStudentRecords() {
@@ -656,7 +701,6 @@ $classes_result = $stmt->get_result();
                 .then(grades => {
                     const tbody = document.getElementById('grades-tbody');
                     tbody.innerHTML = '';
-                    
                     if(grades.length > 0) {
                         document.getElementById('grades-table-title').innerHTML = `Grades for ${grades[0].Given_Name} ${grades[0].Last_Name}`;
                         grades.forEach(grade => {
@@ -668,10 +712,7 @@ $classes_result = $stmt->get_result();
                                     <td>${grade.Grade_Value}</td>
                                     <td><span class="grade-badge">${grade.Grade_Letter}</span></td>
                                     <td>${grade.Date_Recorded}</td>
-                                    <td class="action-buttons">
-                                        <button class="edit-btn" onclick="editGrade(${grade.Grade_ID}, ${grade.Grade_Value})"><i class="fas fa-edit"></i> Edit</button>
-                                        <button class="delete-btn" onclick="deleteGrade(${grade.Grade_ID})"><i class="fas fa-trash"></i> Delete</button>
-                                    </td>
+                                    <td class="action-buttons"></td>
                                 </tr>
                             `;
                         });
@@ -704,10 +745,10 @@ $classes_result = $stmt->get_result();
         document.getElementById('grade-form').addEventListener('submit', function(e) {
             const studentId = document.getElementById('student_id').value;
             const subjectId = document.getElementById('subject_id').value;
-            const quarter = document.getElementById('quarter').value;
+            const semester = document.getElementById('semester').value;
             const gradeValue = document.getElementById('grade_value').value;
             
-            if (!studentId || !subjectId || !quarter || !gradeValue) {
+            if (!studentId || !subjectId || !semester || !gradeValue) {
                 e.preventDefault();
                 alert('Please fill in all required fields.');
                 return false;
@@ -720,6 +761,28 @@ $classes_result = $stmt->get_result();
                 return false;
             }
         });
+        
+        function deleteGradeFromForm() {
+            const gradeId = document.getElementById('grade_id').value;
+            if (!gradeId) return;
+            if(confirm('Are you sure you want to delete this grade?')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'adminRecord.php';
+                const operationInput = document.createElement('input');
+                operationInput.type = 'hidden';
+                operationInput.name = 'operation';
+                operationInput.value = 'delete_grade';
+                form.appendChild(operationInput);
+                const gradeInput = document.createElement('input');
+                gradeInput.type = 'hidden';
+                gradeInput.name = 'grade_id';
+                gradeInput.value = gradeId;
+                form.appendChild(gradeInput);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
     </script>
 </body>
 </html>

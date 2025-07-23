@@ -66,7 +66,9 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $current_year = date('Y') . '-' . (date('Y') + 1);
             
             // First, try to find an existing clearance record
-            $clearance_sql = "SELECT Clearance_ID FROM Clearance WHERE Grade_Level = ? AND School_Year = ? AND Term = 'First Semester' LIMIT 1";
+            $clearance_sql = "SELECT Clearance_ID
+                            FROM Clearance
+                            WHERE Grade_Level = ? AND School_Year = ? AND Term = 'First Semester' LIMIT 1";
             $clearance_stmt = $conn->prepare($clearance_sql);
             $clearance_stmt->bind_param("ss", $grade_level, $current_year);
             $clearance_stmt->execute();
