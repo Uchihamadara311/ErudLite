@@ -28,53 +28,127 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (empty($class_id) || empty($student_id)) {
             $_SESSION['error_message'] = "Please select both a class and a student.";
         } else {
-            // Check if student is already enrolled in any class for this academic year
-            $check_sql = "SELECT e.Class_ID 
-                          FROM Enrollment e
-                          JOIN Class c ON e.Class_ID = c.Class_ID
-                          JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
-                          WHERE e.Student_ID = ? AND cl.School_Year = ? AND e.Status = 'Active'";
-            $stmt = $conn->prepare($check_sql);
-            if ($stmt) {
-                $stmt->bind_param("is", $student_id, $redirect_year);
-                $stmt->execute();
-                $result = $stmt->get_result();
+            // Get the section, room, grade, and year for the selected class
+            $class_info_sql = "SELECT cl.Grade_Level, cl.School_Year, cr.Section, cr.Room
+                               FROM Class c
+                               JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                               JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                               WHERE c.Class_ID = ?";
+            $stmt_info = $conn->prepare($class_info_sql);
+            if ($stmt_info) {
+                $stmt_info->bind_param("i", $class_id);
+                $stmt_info->execute();
+                $info_result = $stmt_info->get_result();
+                if ($info_row = $info_result->fetch_assoc()) {
+                    $grade_level = $info_row['Grade_Level'];
+                    $school_year = $info_row['School_Year'];
+                    $section = $info_row['Section'];
+                    $room = $info_row['Room'];
 
-                if ($result->num_rows > 0) {
-                    $_SESSION['error_message'] = "Student is already enrolled in a class for this academic year.";
-                } else {
-                    // Enroll student
-                    $sql = "INSERT INTO Enrollment (Class_ID, Student_ID, Enrollment_Date, Status) VALUES (?, ?, CURDATE(), 'Active')";
-                    $insert_stmt = $conn->prepare($sql);
-                    if ($insert_stmt) {
-                        $insert_stmt->bind_param("ii", $class_id, $student_id);
-                        if ($insert_stmt->execute()) {
-                            $_SESSION['success_message'] = "Student enrolled successfully!";
+                    // Check if student is already enrolled in any class for this section/room/grade/year
+                    $check_sql = "SELECT e.Class_ID 
+                                  FROM Enrollment e
+                                  JOIN Class c ON e.Class_ID = c.Class_ID
+                                  JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                  JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                  WHERE e.Student_ID = ? AND cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ? AND e.Status = 'Active'";
+                    $stmt = $conn->prepare($check_sql);
+                    if ($stmt) {
+                        $stmt->bind_param("isiss", $student_id, $school_year, $grade_level, $section, $room);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
+                        if ($result->num_rows > 0) {
+                            $_SESSION['error_message'] = "Student is already enrolled in this section for this academic year.";
                         } else {
-                            $_SESSION['error_message'] = "Error enrolling student: " . $insert_stmt->error;
+                            // Enroll student in all classes for this section/room/grade/year (all semesters)
+                            $get_classes_sql = "SELECT c.Class_ID FROM Class c
+                                                JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                                JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                                WHERE cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?";
+                            $stmt_classes = $conn->prepare($get_classes_sql);
+                            if ($stmt_classes) {
+                                $stmt_classes->bind_param("siss", $school_year, $grade_level, $section, $room);
+                                $stmt_classes->execute();
+                                $classes_result = $stmt_classes->get_result();
+                                $success = true;
+                                while ($class_row = $classes_result->fetch_assoc()) {
+                                    $cid = $class_row['Class_ID'];
+                                    $sql = "INSERT INTO Enrollment (Class_ID, Student_ID, Enrollment_Date, Status) VALUES (?, ?, CURDATE(), 'Active')";
+                                    $insert_stmt = $conn->prepare($sql);
+                                    if ($insert_stmt) {
+                                        $insert_stmt->bind_param("ii", $cid, $student_id);
+                                        if (!$insert_stmt->execute()) {
+                                            $success = false;
+                                            $_SESSION['error_message'] = "Error enrolling student: " . $insert_stmt->error;
+                                            break;
+                                        }
+                                    } else {
+                                        $success = false;
+                                        $_SESSION['error_message'] = "Error preparing enrollment statement: " . $conn->error;
+                                        break;
+                                    }
+                                }
+                                if ($success) {
+                                    $_SESSION['success_message'] = "Student enrolled successfully in all semesters!";
+                                }
+                            } else {
+                                $_SESSION['error_message'] = "Error preparing class fetch statement: " . $conn->error;
+                            }
                         }
                     } else {
-                        $_SESSION['error_message'] = "Error preparing enrollment statement: " . $conn->error;
+                        $_SESSION['error_message'] = "Error preparing check statement: " . $conn->error;
                     }
+                } else {
+                    $_SESSION['error_message'] = "Class information not found.";
                 }
             } else {
-                $_SESSION['error_message'] = "Error preparing check statement: " . $conn->error;
+                $_SESSION['error_message'] = "Error preparing class info statement: " . $conn->error;
             }
         }
     } elseif ($operation == 'unenroll') {
         $class_id = (int)$_POST['class_id'];
         $student_id = (int)$_POST['student_id'];
-        $sql = "UPDATE Enrollment SET Status = 'Inactive' WHERE Class_ID = ? AND Student_ID = ?";
-        $stmt = $conn->prepare($sql);
-        if ($stmt) {
-            $stmt->bind_param("ii", $class_id, $student_id);
-            if ($stmt->execute()) {
-                $_SESSION['success_message'] = "Student unenrolled successfully!";
+        
+        // Get the section, room, grade, and year for the selected class to unenroll from all semesters
+        $class_info_sql = "SELECT cl.Grade_Level, cl.School_Year, cr.Section, cr.Room
+                           FROM Class c
+                           JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                           JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                           WHERE c.Class_ID = ?";
+        $stmt_info = $conn->prepare($class_info_sql);
+        if ($stmt_info) {
+            $stmt_info->bind_param("i", $class_id);
+            $stmt_info->execute();
+            $info_result = $stmt_info->get_result();
+            if ($info_row = $info_result->fetch_assoc()) {
+                $grade_level = $info_row['Grade_Level'];
+                $school_year = $info_row['School_Year'];
+                $section = $info_row['Section'];
+                $room = $info_row['Room'];
+
+                // Unenroll from all classes for this section/room/grade/year (all semesters)
+                $sql = "UPDATE Enrollment e 
+                        JOIN Class c ON e.Class_ID = c.Class_ID
+                        JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                        JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                        SET e.Status = 'Inactive' 
+                        WHERE e.Student_ID = ? AND cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?";
+                $stmt = $conn->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param("isiss", $student_id, $school_year, $grade_level, $section, $room);
+                    if ($stmt->execute()) {
+                        $_SESSION['success_message'] = "Student unenrolled successfully from all semesters!";
+                    } else {
+                        $_SESSION['error_message'] = "Error unenrolling student: " . $stmt->error;
+                    }
+                } else {
+                    $_SESSION['error_message'] = "Error preparing unenrollment statement: " . $conn->error;
+                }
             } else {
-                $_SESSION['error_message'] = "Error unenrolling student: " . $stmt->error;
+                $_SESSION['error_message'] = "Class information not found.";
             }
         } else {
-            $_SESSION['error_message'] = "Error preparing unenrollment statement: " . $conn->error;
+            $_SESSION['error_message'] = "Error preparing class info statement: " . $conn->error;
         }
     } elseif ($operation == 'update') {
         $new_class_id = (int)$_POST['class_id'];
@@ -255,26 +329,31 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                         <select class="form-select" name="class_id" id="class_id" required>
                             <option value="">Select a Class (<?php echo $selected_year; ?>)</option>
                             <?php
-                            // Reset pointer to beginning of results
+                            // Separate classes by grade level
                             $classes_result->data_seek(0);
-                            $class_options = [];
+                            $grade_classes = [];
                             if ($classes_result && $classes_result->num_rows > 0) {
                                 while($class = $classes_result->fetch_assoc()) {
-                                    $option = [
+                                    $grade = $class['Grade_Level'];
+                                    if (!isset($grade_classes[$grade])) {
+                                        $grade_classes[$grade] = [];
+                                    }
+                                    $grade_classes[$grade][] = [
                                         'id' => $class['Class_ID'],
-                                        'grade' => $class['Grade_Level'],
                                         'section' => htmlspecialchars($class['Section']),
                                         'room' => htmlspecialchars($class['Room']),
-                                        'enrolled' => $class['enrolled_count'],
-                                        'term' => $class['Term']
+                                        'enrolled' => $class['enrolled_count']
                                     ];
-                                    $class_options[] = $option;
                                 }
                             }
-                            foreach ($class_options as $class) {
-                                echo "<option value='" . $class['id'] . "' data-term='" . $class['term'] . "'>" .
-                                    "Grade " . $class['grade'] . " - " . $class['section'] . " (Room " . $class['room'] . ") - " .
-                                    $class['enrolled'] . " students enrolled [" . $class['term'] . "]</option>";
+                            foreach ($grade_classes as $grade => $classes) {
+                                echo '<optgroup label="Grade ' . $grade . '" class="grade-group grade-' . $grade . '">';
+                                foreach ($classes as $class) {
+                                    echo "<option value='" . $class['id'] . "' data-grade='" . $grade . "'>" .
+                                        $class['section'] . " (Room " . $class['room'] . ") - " .
+                                        $class['enrolled'] . " students enrolled</option>";
+                                }
+                                echo '</optgroup>';
                             }
                             ?>
                         </select>
@@ -294,16 +373,6 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                                 }
                             }
                             ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="term"><i class="fas fa-calendar-alt"></i> Semester *</label>
-                        <select class="form-select" name="term" id="term" required>
-                            <option value="">Select Semester</option>
-                            <option value="1st Semester">1st Semester</option>
-                            <option value="2nd Semester">2nd Semester</option>
-                            <option value="3rd Semester">3rd Semester</option>
-                            <option value="4th Semester">4th Semester</option>
                         </select>
                     </div>
                 </div>
@@ -371,27 +440,7 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
     <script>
-        function filterClassList() {
-            var selectedTerm = document.getElementById('term').value;
-            var selectedGrade = document.getElementById('grade_level').value;
-            var classSelect = document.getElementById('class_id');
-            Array.from(classSelect.options).forEach(function(option) {
-                if (!option.value) return; // skip placeholder
-                var matchesTerm = (selectedTerm === '' || option.getAttribute('data-term') === selectedTerm);
-                var matchesGrade = (selectedGrade === '' || option.textContent.indexOf('Grade ' + selectedGrade + ' ') !== -1);
-                if (matchesTerm && matchesGrade) {
-                    option.style.display = '';
-                } else {
-                    option.style.display = 'none';
-                }
-            });
-            // Reset selection if current selected class is hidden
-            if (classSelect.selectedIndex > 0 && classSelect.options[classSelect.selectedIndex].style.display === 'none') {
-                classSelect.selectedIndex = 0;
-            }
-        }
-        document.getElementById('term').addEventListener('change', filterClassList);
-        document.getElementById('grade_level').addEventListener('change', filterClassList);
+        // Removed unused filterClassList and term event listeners. Grade level filtering is handled below.
 
         // Student search autosuggest
         const studentSearch = document.getElementById('studentSearch');
@@ -465,7 +514,7 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                 hiddenStudentInput.remove();
             }
             // Reset class filter
-            filterClassList();
+            // The grade level filter is handled by the IIFE below.
         }
 
         function editEnrollment(classId, studentId, studentName) {
@@ -546,6 +595,38 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                 row.style.display = text.indexOf(filter) > -1 ? "" : "none";
             });
         });
+
+        // Dynamically filter class dropdown based on selected grade level
+(function() {
+    var gradeLevelSelect = document.getElementById('grade_level');
+    var classSelect = document.getElementById('class_id');
+    function updateClassDropdown() {
+        var selectedGrade = gradeLevelSelect.value;
+        // Loop through optgroups and options
+        Array.from(classSelect.getElementsByTagName('optgroup')).forEach(function(group) {
+            var gradeMatch = group.label.match(/Grade (\d+)/);
+            var groupGrade = gradeMatch ? gradeMatch[1] : '';
+            if (!selectedGrade || groupGrade === selectedGrade) {
+                group.style.display = '';
+                Array.from(group.children).forEach(function(option) {
+                    option.style.display = '';
+                });
+            } else {
+                group.style.display = 'none';
+                Array.from(group.children).forEach(function(option) {
+                    option.style.display = 'none';
+                });
+            }
+        });
+        // Reset selection if current selected class is hidden
+        if (classSelect.selectedIndex > 0 && classSelect.options[classSelect.selectedIndex].style.display === 'none') {
+            classSelect.selectedIndex = 0;
+        }
+    }
+    gradeLevelSelect.addEventListener('change', updateClassDropdown);
+    // Initial call to set correct state on page load
+    updateClassDropdown();
+})();
     </script>
 </body>
 </html>
