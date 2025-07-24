@@ -69,7 +69,7 @@ if(!isset($_SESSION['email'])) {
                         <br>Schedule<br>and Calendar
                     </span>
                 </a>
-                <a href="">
+                <a href="studentClearance.php">
                     <span>
                         <i class="icon fa-regular fa-square-check"></i>
                         <br>Subject<br>Clearance
