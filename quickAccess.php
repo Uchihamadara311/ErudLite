@@ -57,7 +57,7 @@ if(!isset($_SESSION['email'])) {
                         Announcement<br>Notice
                     </span>
                 </a>
-                <a href="">
+                <a href="reportCard.php">
                     <span>
                         <i class="icon fa-solid fa-chart-simple"></i>
                         <br>Student Report<br>Card

@@ -11,7 +11,7 @@
     <header id="header-placeholder"></header>
     <main class="report-container">
         <div class="report-header">
-            <h1>DIGITAL REPORT CARD</h1>
+            <h1>SUBJECT REQUIREMENTS</h1>
             <div class="action-buttons">
                 <button class="btn-primary" onclick="downloadPDF()">
                     <i class="fas fa-download"></i> Download PDF

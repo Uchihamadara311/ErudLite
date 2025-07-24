@@ -3,8 +3,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PMS</title>
-    <link rel="stylesheet" href="css/studentReport.css">
     <link rel="stylesheet" href="css/essential.css">
+    <link rel="stylesheet" href="css/studentReport.css">
 </head>
 <body>
     <header id="header-placeholder"></header>
@@ -47,5 +47,6 @@
             </table> -->
     </main>
     <footer id="footer-placeholder"></footer>
+    <script src="js/layout-loader.js"></script>
 </body>
 </html>

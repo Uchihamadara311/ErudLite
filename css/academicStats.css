@@ -1,0 +1,328 @@
+main {
+    display: flex;
+    justify-content: flex-start;
+    flex-direction: row;
+    min-height: calc(100vh - 75px - 5vh);
+    padding-bottom: 5vh;
+}
+
+/* LEFT CONTAINER - Enhanced */
+.leftContainer {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    width: 280px;
+    min-width: 280px;
+    height: fit-content;
+    background: white;
+    margin: 30px 0 30px 30px;
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    padding: 30px;
+}
+
+.profileSection {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.imageCircle {
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    background: #ddd;
+}
+
+.leftContainer h1 {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+    width: 100%;
+}
+
+.leftContainer p {
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+    width: 100%;
+    margin-bottom: 30px;
+}
+
+.backButton {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-radius: 10px;
+    color: #666;
+    text-decoration: none;
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+    margin-bottom: 20px;
+    width: 100%;
+}
+
+.backButton:hover {
+    background: #f0f0f0;
+}
+
+/* RIGHT CONTAINER - Enhanced */
+.rightContainer {
+    display: flex;
+    width: 100%;
+    padding: 30px;
+    gap: 30px;
+}
+
+.leftCards {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    width: 50%;
+}
+
+.rightCards {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+
+.card-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+/* GPA Card */
+.GPA {
+    flex: 0 0 auto;
+}
+
+.gpa-display {
+    font-size: 72px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    line-height: 1;
+}
+
+/* Attendance Card */
+.ATTENDANCE {
+    flex: 1;
+    position: relative;
+}
+
+.attendance-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.attendance-day {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.attendance-day:hover {
+    transform: scale(1.1);
+}
+
+.present { background: #4CAF50; }
+.absent { background: #f44336; }
+.late { background: #ff9800; }
+.excused { background: #9e9e9e; }
+
+.attendance-legend {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.appeal-badge {
+    background: #f44336;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: bold;
+    position: absolute;
+    top: -10px;
+    right: -10px;
+}
+
+/* Quarter Card */
+.QUARTER {
+    flex: 0 0 auto;
+}
+
+.quarter-display {
+    font-size: 72px;
+    font-weight: bold;
+    color: #333;
+    text-align: center;
+    line-height: 1;
+}
+
+/* Subject Grades Card */
+.SUBJECT_GRADES {
+    padding: 30px;
+    border-radius: 20px;
+    background: white;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+    height: 100%;
+}
+
+.SUBJECT_GRADES:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+
+.SUBJECT_GRADES h2 {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.SUBJECT_GRADES p {
+    color: #999;
+    font-size: 14px;
+    margin-bottom: 30px;
+}
+
+.grades-chart {
+    height: 85%;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.grade-bar {
+    flex: 1;
+    background: #666;
+    border-radius: 8px 8px 0 0;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 20px;
+    width: 2rem;
+}
+
+.grade-bar:hover {
+    background: #7ed6b3;
+}
+
+.subject-label {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+    width: 100%;
+}
+
+.grade-value {
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.grade-bar:hover .grade-value {
+    opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .rightContainer {
+        flex-direction: column;
+    }
+    
+    .leftCards {
+        width: 100%;
+        flex-direction: row;
+    }
+    
+    .leftCards > * {
+        flex: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    main {
+        flex-direction: column;
+        padding: 15px;
+    }
+    
+    .leftContainer {
+        width: 100%;
+        margin: 15px 0;
+    }
+    
+    .rightContainer {
+        padding: 0;
+    }
+    
+    .leftCards {
+        flex-direction: column;
+    }
+    
+    .attendance-legend {
+        justify-content: center;
+    }
+    
+    .grades-chart {
+        gap: 8px;
+    }
+}
