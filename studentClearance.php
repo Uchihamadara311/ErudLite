@@ -26,10 +26,24 @@
         </div>
 
         <div class="student-info-card">
-            <h3>Student Information</h3>
+            <h3>Subject Information</h3>
             <div class="student-info">
                 <div class="info-section">
+                    <label>Quarter:</label>
+                    <select id="quarter">
+                        <option value="">Select term</option>
+                        <option value="1">1st</option>
+                        <option value="2">2nd</option>
+                        <option value="3">3rd</option>
+                        <option value="4">4th</option>
+                    </select>
+                </div>
+                <div class="info-section">
                     <label>Subject:</label>
+                    <input type="text" id="subjectName" placeholder="Enter subject name">
+                </div>
+                <div class="info-section">
+                    <label>School Year:</label>
                     <input type="text" id="schoolYear" placeholder="2024-2025">
                 </div>
                 <div class="info-section">
@@ -43,22 +57,30 @@
             <h3>Academic Performance</h3>
             <div class="grades-table">
                 <table id="reportTable">
+                    <h3 style="padding: 4px;">Mathematics - Fourth Quarter</h3>
                     <thead>
                         <tr>
-                            <th rowspan="2">Learning Area</th>
-                            <th colspan="4">GRADING PERIOD</th>
-                            <th rowspan="2">Final Rating</th>
-                            <th rowspan="2">REMARKS</th>
-                        </tr>
-                        <tr>
-                            <th>1st</th>
-                            <th>2nd</th>
-                            <th>3rd</th>
-                            <th>4th</th>
+                            <th>Assignments</th>
+                            <th>Status</th>
+                            <th>Grade</th>
                         </tr>
                     </thead>
-                    <tbody id="gradesBody">
-                        <!-- Grades will be populated by JavaScript -->
+                    <tbody>
+                        <tr>
+                            <td>Test</td>
+                            <td>Not Submitted</td>
+                            <td>N/A</td>
+                        </tr>
+                        <tr>
+                            <td>Project</td>
+                            <td>Pending</td>
+                            <td>N/A</td>
+                        </tr>
+                        <tr>
+                            <td>Homework</td>
+                            <td>Submitted</td>
+                            <td>14/25</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
