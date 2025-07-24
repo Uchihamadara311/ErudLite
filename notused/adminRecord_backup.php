@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
+    header("Location: index.php");
     exit();
 }
 

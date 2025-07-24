@@ -2,6 +2,12 @@
 require_once 'includes/db.php';
 session_start();
 
+// Ensure user is logged in and has admin permissions
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: index.php");
+    exit();
+}
+
 // Function to get all instructors for subject assignments
 function getAllInstructorsForSubject($conn) {
     $sql = "SELECT 
@@ -23,12 +29,6 @@ function getAllSubjectsWithGrade($conn) {
             JOIN Clearance c ON s.Clearance_ID = c.Clearance_ID
             ORDER BY c.Grade_Level, s.Subject_Name";
     return $conn->query($sql);
-}
-
-// Ensure user is logged in and has admin permissions
-if (!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
-    exit();
 }
 
 // Function to assign subject to instructor

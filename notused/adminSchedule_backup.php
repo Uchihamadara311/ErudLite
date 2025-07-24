@@ -1,15 +1,16 @@
 <?php 
 require_once 'includes/db.php';
 
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: index.php");
+    exit();
+}
+
 // Check if user is logged in and is admin
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
-    exit();
-}
 
 // Handle AJAX request for getting subjects by instructor
 if (isset($_GET['action']) && $_GET['action'] == 'get_subjects' && isset($_GET['instructor_id'])) {

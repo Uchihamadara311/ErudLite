@@ -33,7 +33,7 @@ function getSubjectDetails($conn, $subject_id) {
 
 // Ensure user is logged in and has admin permissions
 if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
+    header("Location: index.php");
     exit();
 }
 

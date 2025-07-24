@@ -18,7 +18,7 @@ if(!isset($_SESSION['email'])) {
 <body>
     <header>
         <div class="topBar">
-            <a class="logo-text" href="quickAccess.php">
+            <a class="logo-text" href="index.php">
                 <img src="assets/logo.png" alt="PMS Logo" class="logo">
                 <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
                     <h3>ERUDLITE [ADMIN]</h3>
@@ -29,7 +29,7 @@ if(!isset($_SESSION['email'])) {
                 <?php endif; ?>
             </a>
             <div class="navBar">
-                <a href="quickAccess.php">Home</a>
+                <a href="index.php">Home</a>
                 <a href="about.php">About</a>
                 <div class="profile-dropdown">
                     <a href="#" class="profile-trigger">

@@ -2,16 +2,16 @@
 require_once 'includes/db.php';
 session_start();
 
+// Ensure user is logged in and has admin permissions
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: index.php");
+    exit();
+}
 // Function to clean input data
 function cleanInput($data) {
     return trim(htmlspecialchars($data));
 }
 
-// Ensure user is logged in and has admin permissions
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
-    exit();
-}
 
 // Initialize messages
 $success_message = '';

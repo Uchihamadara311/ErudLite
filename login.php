@@ -3,7 +3,7 @@ require 'includes/db.php';
 
 // Redirect if already logged in
 if(isset($_SESSION['email'])) {
-    header("Location: quickAccess.php");
+    header("Location: index.php");
     exit();
 }
 
@@ -70,7 +70,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
 
                 // Redirect after successful login
-                header("Location: quickAccess.php");
+                header("Location: index.php");
                 exit();
             } else {
                 $error_message = "Invalid password";
