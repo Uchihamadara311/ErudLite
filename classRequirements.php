@@ -11,7 +11,7 @@
     <main style="border: 50px">
         <div class="topReport">
             <section style="text-align: center">
-                <h1>Student Report</h1>
+                <h1>Class Requirements</h1>
             </section>
             <section style="display: flex; justify-content: center; gap: 20px">
                 <button>Download PDF</button>
@@ -22,7 +22,7 @@
             <i class="fa fa-arrow-left" style="margin-right: 10px"></i>Back to Dashboard
         </a>
         <div style="width: 99%; background-color: rgb(244, 244, 244); padding: 20px; border-radius: 10px; margin-top: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <!-- <table>
+            <table>
                 <thead>
                     <tr>
                         <th>Course</th>
@@ -47,7 +47,7 @@
                         <td>Room 103</td>
                     </tr>
                 </tbody>
-            </table> -->
+            </table>
     </main>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>

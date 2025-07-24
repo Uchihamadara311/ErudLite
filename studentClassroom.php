@@ -11,7 +11,7 @@
     <main style="border: 50px">
         <div class="topReport">
             <section style="text-align: center">
-                <h1>Student Report</h1>
+                <h1>Student List for ___ Class</h1>
             </section>
             <section style="display: flex; justify-content: center; gap: 20px">
                 <button>Download PDF</button>

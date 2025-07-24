@@ -53,26 +53,6 @@ main {
     margin-bottom: 30px;
 }
 
-.backButton {
-    display: flex;
-    align-items: center;
-    padding: 10px 15px;
-    border-radius: 10px;
-    color: #666;
-    text-decoration: none;
-    background: none;
-    border: none;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background 0.3s;
-    margin-bottom: 20px;
-    width: 100%;
-}
-
-.backButton:hover {
-    background: #f0f0f0;
-}
-
 /* RIGHT CONTAINER - Enhanced */
 .rightContainer {
     display: flex;

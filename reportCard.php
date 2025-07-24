@@ -9,6 +9,9 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
+    <a href="studentDashboard.php" class="backButton">
+        <i class="fa fa-arrow-left" style="margin-right: 10px"></i>Back to Dashboard
+    </a>
     <main class="report-container">
         <div class="report-header">
             <h1>DIGITAL REPORT CARD</h1>

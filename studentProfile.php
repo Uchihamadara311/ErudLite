@@ -104,9 +104,9 @@ if ($completed > 0) {
                 </div>
             </div>
             <div class="quickLinks">
-                <a href="studentReport.php">Student Report</a>
-                <a href="reportCard.php">Classroom</a>
-                <a href="#">Clearance</a>
+                <a href="reportCard.php">Student Report</a>
+                <a href="studentClassroom.php">Classroom</a>
+                <a href="studentClearance.php">Clearance</a>
                 <a href="studentSchedule.php">Schedule</a>
             </div>
             <div class="basicInfo" style="margin-top: 20px;">
