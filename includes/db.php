@@ -7,7 +7,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Database connection
 if (!isset($conn) || $conn === null) {
-    $conn = new mysqli("localhost", "root", "", "erudlite_2");
+    // OLD DATABASE = erudlite_2
+    // NEW DATABASE = erudlite
+    $conn = new mysqli("localhost", "root", "", "erudlite");
     if ($conn->connect_error) {
         die("Connection failed: " . $conn->connect_error);
     }

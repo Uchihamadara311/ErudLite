@@ -51,7 +51,7 @@ if(!isset($_SESSION['email'])) {
             </div>
         </div>
     </header>
-    <footer style="z-index: 1000>
+    <footer style="z-index: 1000">
         <p>&copy Erudlite PMS 2025</p>
     </footer>
 </body>
