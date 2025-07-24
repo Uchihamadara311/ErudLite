@@ -60,24 +60,35 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         if ($result->num_rows > 0) {
                             $_SESSION['error_message'] = "Student is already enrolled in this section for this academic year.";
                         } else {
-                            // Enroll student in all classes for this section/room/grade/year (all semesters)
+                            // Get all classes for this section and check which ones student is NOT enrolled in
                             $get_classes_sql = "SELECT c.Class_ID FROM Class c
                                                 JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
                                                 JOIN Classroom cr ON c.Room_ID = cr.Room_ID
-                                                WHERE cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?";
+                                                WHERE cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?
+                                                AND c.Class_ID NOT IN (
+                                                    SELECT e.Class_ID FROM Enrollment e 
+                                                    WHERE e.Student_ID = ? AND e.Status = 'Active'
+                                                )";
                             $stmt_classes = $conn->prepare($get_classes_sql);
                             if ($stmt_classes) {
-                                $stmt_classes->bind_param("siss", $school_year, $grade_level, $section, $room);
+                                $stmt_classes->bind_param("sissi", $school_year, $grade_level, $section, $room, $student_id);
                                 $stmt_classes->execute();
                                 $classes_result = $stmt_classes->get_result();
                                 $success = true;
+                                $enrolled_count = 0;
                                 while ($class_row = $classes_result->fetch_assoc()) {
                                     $cid = $class_row['Class_ID'];
-                                    $sql = "INSERT INTO Enrollment (Class_ID, Student_ID, Enrollment_Date, Status) VALUES (?, ?, CURDATE(), 'Active')";
+                                    // Use INSERT ... ON DUPLICATE KEY UPDATE to handle existing records
+                                    $sql = "INSERT INTO Enrollment (Class_ID, Student_ID, Enrollment_Date, Status) 
+                                            VALUES (?, ?, CURDATE(), 'Active')
+                                            ON DUPLICATE KEY UPDATE 
+                                            Enrollment_Date = CURDATE(), Status = 'Active'";
                                     $insert_stmt = $conn->prepare($sql);
                                     if ($insert_stmt) {
                                         $insert_stmt->bind_param("ii", $cid, $student_id);
-                                        if (!$insert_stmt->execute()) {
+                                        if ($insert_stmt->execute()) {
+                                            $enrolled_count++;
+                                        } else {
                                             $success = false;
                                             $_SESSION['error_message'] = "Error enrolling student: " . $insert_stmt->error;
                                             break;
@@ -88,8 +99,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                                         break;
                                     }
                                 }
-                                if ($success) {
-                                    $_SESSION['success_message'] = "Student enrolled successfully in all semesters!";
+                                if ($success && $enrolled_count > 0) {
+                                    $_SESSION['success_message'] = "Student enrolled successfully in $enrolled_count semester(s)!";
+                                } elseif ($enrolled_count == 0) {
+                                    $_SESSION['error_message'] = "Student is already enrolled in all semesters for this section.";
                                 }
                             } else {
                                 $_SESSION['error_message'] = "Error preparing class fetch statement: " . $conn->error;
@@ -158,25 +171,74 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (empty($new_class_id) || empty($student_id) || empty($original_class_id)) {
             $_SESSION['error_message'] = "Missing data for update.";
         } else {
-            // Using a transaction to ensure data integrity
+            // Get info for both old and new classes
+            $old_class_info_sql = "SELECT cl.Grade_Level, cl.School_Year, cr.Section, cr.Room
+                                   FROM Class c
+                                   JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                   JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                   WHERE c.Class_ID = ?";
+            $new_class_info_sql = "SELECT cl.Grade_Level, cl.School_Year, cr.Section, cr.Room
+                                   FROM Class c
+                                   JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                   JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                   WHERE c.Class_ID = ?";
+            
             $conn->begin_transaction();
             try {
-                // Set the old enrollment to Inactive
-                $sql_inactive = "UPDATE Enrollment SET Status = 'Inactive' WHERE Class_ID = ? AND Student_ID = ?";
+                // Get old class info
+                $stmt_old = $conn->prepare($old_class_info_sql);
+                if (!$stmt_old) throw new Exception("Error preparing old class info statement: " . $conn->error);
+                $stmt_old->bind_param("i", $original_class_id);
+                $stmt_old->execute();
+                $old_info = $stmt_old->get_result()->fetch_assoc();
+                if (!$old_info) throw new Exception("Old class information not found");
+
+                // Get new class info
+                $stmt_new = $conn->prepare($new_class_info_sql);
+                if (!$stmt_new) throw new Exception("Error preparing new class info statement: " . $conn->error);
+                $stmt_new->bind_param("i", $new_class_id);
+                $stmt_new->execute();
+                $new_info = $stmt_new->get_result()->fetch_assoc();
+                if (!$new_info) throw new Exception("New class information not found");
+
+                // Set all old enrollments to Inactive (all semesters of old section)
+                $sql_inactive = "UPDATE Enrollment e 
+                                JOIN Class c ON e.Class_ID = c.Class_ID
+                                JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                SET e.Status = 'Inactive' 
+                                WHERE e.Student_ID = ? AND cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?";
                 $stmt_inactive = $conn->prepare($sql_inactive);
                 if (!$stmt_inactive) throw new Exception("Error preparing statement to set old enrollment inactive: " . $conn->error);
-                $stmt_inactive->bind_param("ii", $original_class_id, $student_id);
+                $stmt_inactive->bind_param("isiss", $student_id, $old_info['School_Year'], $old_info['Grade_Level'], $old_info['Section'], $old_info['Room']);
                 if (!$stmt_inactive->execute()) throw new Exception("Error setting old enrollment to inactive: " . $stmt_inactive->error);
 
-                // Insert the new enrollment record
-                $sql_active = "INSERT INTO Enrollment (Class_ID, Student_ID, Enrollment_Date, Status) VALUES (?, ?, CURDATE(), 'Active')";
-                $stmt_active = $conn->prepare($sql_active);
-                if (!$stmt_active) throw new Exception("Error preparing statement to insert new enrollment: " . $conn->error);
-                $stmt_active->bind_param("ii", $new_class_id, $student_id);
-                if (!$stmt_active->execute()) throw new Exception("Error inserting new enrollment: " . $stmt_active->error);
+                // Insert new enrollment records for all semesters of new section
+                $get_new_classes_sql = "SELECT c.Class_ID FROM Class c
+                                        JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                        JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                        WHERE cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?";
+                $stmt_new_classes = $conn->prepare($get_new_classes_sql);
+                if (!$stmt_new_classes) throw new Exception("Error preparing new classes statement: " . $conn->error);
+                $stmt_new_classes->bind_param("siss", $new_info['School_Year'], $new_info['Grade_Level'], $new_info['Section'], $new_info['Room']);
+                $stmt_new_classes->execute();
+                $new_classes_result = $stmt_new_classes->get_result();
+                
+                while ($new_class_row = $new_classes_result->fetch_assoc()) {
+                    $new_cid = $new_class_row['Class_ID'];
+                    // Use INSERT ... ON DUPLICATE KEY UPDATE to handle existing records
+                    $sql_active = "INSERT INTO Enrollment (Class_ID, Student_ID, Enrollment_Date, Status) 
+                                   VALUES (?, ?, CURDATE(), 'Active')
+                                   ON DUPLICATE KEY UPDATE 
+                                   Enrollment_Date = CURDATE(), Status = 'Active'";
+                    $stmt_active = $conn->prepare($sql_active);
+                    if (!$stmt_active) throw new Exception("Error preparing statement to insert new enrollment: " . $conn->error);
+                    $stmt_active->bind_param("ii", $new_cid, $student_id);
+                    if (!$stmt_active->execute()) throw new Exception("Error inserting new enrollment: " . $stmt_active->error);
+                }
 
                 $conn->commit();
-                $_SESSION['success_message'] = "Student enrollment updated successfully!";
+                $_SESSION['success_message'] = "Student enrollment updated successfully for all semesters!";
             } catch (Exception $e) {
                 $conn->rollback();
                 $_SESSION['error_message'] = "Failed to update enrollment: " . $e->getMessage();
@@ -202,16 +264,16 @@ if (isset($_SESSION['error_message'])) {
 // Get academic year filter
 $selected_year = isset($_GET['year']) ? $_GET['year'] : date('Y') . '-' . (date('Y') + 1);
 
-// Get all available classes with grade levels for the selected year
-$classes_sql = "SELECT c.Class_ID, cl.Grade_Level, cl.School_Year, cl.Term, cr.Room, cr.Section,
-                       COUNT(e.Student_ID) as enrolled_count
+// Get all available classes with grade levels for the selected year (grouped by section)
+$classes_sql = "SELECT cl.Grade_Level, cl.School_Year, cr.Room, cr.Section,
+                       COUNT(DISTINCT e.Student_ID) as enrolled_count,
+                       MIN(c.Class_ID) as Class_ID
                 FROM Class c
                 JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
                 JOIN Classroom cr ON c.Room_ID = cr.Room_ID
                 LEFT JOIN Enrollment e ON c.Class_ID = e.Class_ID AND e.Status = 'Active'
                 WHERE cl.School_Year = ?
-                GROUP BY c.Class_ID, cl.Grade_Level, cl.School_Year, cl.Term, cr.Room, cr.Section
-                HAVING COUNT(e.Student_ID) >= 0
+                GROUP BY cl.Grade_Level, cl.School_Year, cr.Room, cr.Section
                 ORDER BY cl.Grade_Level, cr.Room";
 $stmt_classes = $conn->prepare($classes_sql);
 if(!$stmt_classes) { die("Prepare failed for classes: " . $conn->error); }
@@ -239,8 +301,8 @@ $stmt_students->execute();
 $available_students_result = $stmt_students->get_result();
 if(!$available_students_result) { die("Get result failed for students: " . $conn->error); }
 
-// Get enrolled students for the table
-$enrolled_sql = "SELECT s.Student_ID, pb.Given_Name, pb.Last_Name, e.Enrollment_Date, e.Status, c.Class_ID, clr.Grade_Level, cr.Room
+// Show only one row per student per section/room/grade/year (distinct enrollment group)
+$enrolled_sql = "SELECT s.Student_ID, pb.Given_Name, pb.Last_Name, MIN(e.Enrollment_Date) AS Enrollment_Date, e.Status, clr.Grade_Level, cr.Room, cr.Section
                 FROM Student s
                 JOIN Profile p ON s.Profile_ID = p.Profile_ID
                 JOIN Profile_Bio pb ON s.Profile_ID = pb.Profile_ID
@@ -248,7 +310,9 @@ $enrolled_sql = "SELECT s.Student_ID, pb.Given_Name, pb.Last_Name, e.Enrollment_
                 JOIN Class c ON e.Class_ID = c.Class_ID
                 JOIN Clearance clr ON c.Clearance_ID = clr.Clearance_ID
                 JOIN Classroom cr ON c.Room_ID = cr.Room_ID
-                WHERE e.Status = 'Active' AND clr.School_Year = ?;";
+                WHERE e.Status = 'Active' AND clr.School_Year = ?
+                GROUP BY s.Student_ID, pb.Given_Name, pb.Last_Name, clr.Grade_Level, cr.Room, cr.Section, e.Status
+                ORDER BY clr.Grade_Level, cr.Room, cr.Section, pb.Last_Name, pb.Given_Name";
 $stmt_enrollments = $conn->prepare($enrolled_sql);
 if(!$stmt_enrollments) { die("Prepare failed for enrollments: " . $conn->error); }
 $stmt_enrollments->bind_param("s", $selected_year);
@@ -403,7 +467,6 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                             <th><i class="fas fa-graduation-cap"></i> Grade Level</th>
                             <th><i class="fas fa-door-open"></i> Room</th>
                             <th><i class="fas fa-calendar-alt"></i> Enrollment Date</th>
-                            <th><i class="fas fa-info-circle"></i> Status</th>
                             <th><i class="fas fa-cog"></i> Actions</th>
                         </tr>
                     </thead>
@@ -413,18 +476,29 @@ if(!$enrolled_result) { die("Get result failed for enrollments: " . $conn->error
                             while($row = $enrolled_result->fetch_assoc()) {
                                 $gradeLevel = htmlspecialchars($row['Grade_Level']);
                                 $studentName = htmlspecialchars($row['Given_Name'] . ' ' . $row['Last_Name']);
+                                // Find a class_id for this group (for edit/unenroll actions, pick any class in the group)
+                                $find_class_sql = "SELECT c.Class_ID FROM Class c
+                                                    JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                                                    JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                                                    WHERE cl.School_Year = ? AND cl.Grade_Level = ? AND cr.Section = ? AND cr.Room = ?
+                                                    LIMIT 1";
+                                $find_class_stmt = $conn->prepare($find_class_sql);
+                                $find_class_stmt->bind_param("siss", $selected_year, $row['Grade_Level'], $row['Section'], $row['Room']);
+                                $find_class_stmt->execute();
+                                $find_class_result = $find_class_stmt->get_result();
+                                $class_id_for_action = ($find_class_row = $find_class_result->fetch_assoc()) ? $find_class_row['Class_ID'] : 0;
+
                                 echo "<tr class='clickable-row' style='cursor: pointer;' onclick='editEnrollment(" .
-                                      $row['Class_ID'] . ", " . $row['Student_ID'] . ", \"" . $studentName . "\")'>";
+                                      $class_id_for_action . ", " . $row['Student_ID'] . ", \"" . $studentName . "\")'>";
                                 echo "<td><i class='fas fa-user'></i> " . $studentName . "</td>";
                                 echo "<td><span class='grade-badge grade-level-{$gradeLevel}'><i class='fas fa-graduation-cap'></i> Grade {$gradeLevel}</span></td>";
                                 echo "<td><i class='fas fa-door-open'></i> Room " . htmlspecialchars($row['Room']) . "</td>";
                                 echo "<td>" . htmlspecialchars($row['Enrollment_Date']) . "</td>";
-                                echo "<td><span class='role-badge admin'><i class='fas fa-check-circle'></i> " . htmlspecialchars($row['Status']) . "</span></td>";
                                 echo "<td class='action-buttons'>";
                                 echo "<button class='edit-btn' onclick='event.stopPropagation(); editEnrollment(" .
-                                      $row['Class_ID'] . ", " . $row['Student_ID'] . ", \"" . $studentName . "\")'><i class='fas fa-edit'></i> Edit</button>";
+                                      $class_id_for_action . ", " . $row['Student_ID'] . ", \"" . $studentName . "\")'><i class='fas fa-edit'></i> Edit</button>";
                                 echo "<button class='delete-btn' onclick='event.stopPropagation(); unenrollStudent(" .
-                                      $row['Class_ID'] . ", " . $row['Student_ID'] . ", \"" . $studentName . "\")'><i class='fas fa-user-minus'></i> Unenroll</button>";
+                                      $class_id_for_action . ", " . $row['Student_ID'] . ", \"" . $studentName . "\")'><i class='fas fa-user-minus'></i> Unenroll</button>";
                                 echo "</td>";
                                 echo "</tr>";
                             }
