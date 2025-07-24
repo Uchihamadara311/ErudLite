@@ -48,6 +48,33 @@ if(!isset($_SESSION['email'])) {
                         <br>Manage<br>Account
                     </span>
                 </a>
+            <?php elseif(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Instructor'): ?>
+                <!-- Instructor Options -->
+                <a href="instructorAttendanceManagement.php">
+                    <span>
+                        <i class="fa-solid fa-award" style="font-size: 2em; margin-bottom: 5px;"></i>
+                        <br>
+                        Attendance<br>Management
+                    </span>
+                </a>
+                <a href="instructorRecord.php">
+                    <span>
+                        <i class="icon fa-solid fa-chart-simple"></i>
+                        <br>Grade<br>Management
+                    </span>
+                </a>
+                <a href="instructorSchedule.php">
+                    <span>
+                        <i class="icon fa-solid fa-calendar-days"></i>
+                        <br>Schedule<br>and Calendar
+                    </span>
+                </a>
+                <a href="instructorSubjectClearance.php">
+                    <span>
+                        <i class="icon fa-regular fa-square-check"></i>
+                        <br>Subject<br>Clearance
+                    </span>
+                </a>
             <?php else: ?>
                 <!-- Student Options -->
                 <a href="">

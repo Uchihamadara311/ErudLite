@@ -35,6 +35,7 @@ if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
                 <li><a href="adminEnrollment.php" class="card card-link"><i class="fa-solid fa-user-graduate"></i><span>Enrollment Management</span></a></li>
                 <li><a href="adminSchedule.php" class="card card-link"><i class="fa-solid fa-calendar-days"></i><span>Schedule Management</span></a></li>
                 <li><a href="adminRecord.php" class="card card-link"><i class="fa-solid fa-file-lines"></i><span>Record Management</span></a></li>
+                <li><a href="adminSubjectClearance.php" class="card card-link"><i class="fa-solid fa-clipboard-check"></i><span>Subject Clearance</span></a></li>
             </ul>
         </div>
     </main>
