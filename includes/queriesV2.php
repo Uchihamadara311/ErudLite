@@ -31,15 +31,6 @@ function getAllUsers($conn) {
     return $conn->query($sql);
 }
 
-// Function to get all subjects
-function getAllSubjectsWithGrade($conn) {
-    $sql = "SELECT s.Subject_ID, s.Subject_Name, s.Description, c.Grade_Level
-            FROM Subject s
-            LEFT JOIN Clearance c ON s.Clearance_ID = c.Clearance_ID
-            ORDER BY c.Grade_Level, s.Subject_Name";
-    return $conn->query($sql);
-}
-
 function getAllSubjects($conn) {
     $sql = "SELECT Subject_ID, Subject_Name FROM Subject ORDER BY Subject_Name";
     return $conn->query($sql);

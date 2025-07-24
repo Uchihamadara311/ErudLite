@@ -84,7 +84,7 @@ if(!isset($_SESSION['email'])) {
                         Announcement<br>Notice
                     </span>
                 </a>
-                <a href="">
+                <a href="studentReport.php">
                     <span>
                         <i class="icon fa-solid fa-chart-simple"></i>
                         <br>Student Report<br>Card
@@ -96,7 +96,7 @@ if(!isset($_SESSION['email'])) {
                         <br>Schedule<br>and Calendar
                     </span>
                 </a>
-                <a href="">
+                <a href="studentClearance.php">
                     <span>
                         <i class="icon fa-regular fa-square-check"></i>
                         <br>Subject<br>Clearance
