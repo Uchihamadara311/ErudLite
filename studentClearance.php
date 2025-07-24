@@ -29,31 +29,7 @@
             <h3>Student Information</h3>
             <div class="student-info">
                 <div class="info-section">
-                    <label>Student Name:</label>
-                    <input type="text" id="studentName" placeholder="Enter full name">
-                </div>
-                <div class="info-section">
-                    <label>Student ID:</label>
-                    <input type="text" id="studentId" placeholder="Enter ID number">
-                </div>
-                <div class="info-section">
-                    <label>Grade Level:</label>
-                    <select id="gradeLevel">
-                        <option value="">Select Grade</option>
-                        <option value="Grade 1">Grade 1</option>
-                        <option value="Grade 2">Grade 2</option>
-                        <option value="Grade 3">Grade 3</option>
-                        <option value="Grade 4">Grade 4</option>
-                        <option value="Grade 5">Grade 5</option>
-                        <option value="Grade 6">Grade 6</option>
-                    </select>
-                </div>
-                <div class="info-section">
-                    <label>Section:</label>
-                    <input type="text" id="section" placeholder="Enter section">
-                </div>
-                <div class="info-section">
-                    <label>School Year:</label>
+                    <label>Subject:</label>
                     <input type="text" id="schoolYear" placeholder="2024-2025">
                 </div>
                 <div class="info-section">

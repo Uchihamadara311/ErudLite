@@ -26,25 +26,27 @@
                 <thead>
                     <tr>
                         <th>Course</th>
-                        <th>Time</th>
-                        <th>Room</th>
+                        <th>Assignments</th>
+                        <th>Status</th>
+                        <th>Grade</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Mathematics</td>
-                        <td>9:00 AM - 10:30 AM</td>
-                        <td>Room 101</td>
+                        <td rowspan="3">Mathematics&nbsp;&nbsp;</td>
+                        <td>Test</td>
+                        <td>Not Submitted</td>
+                        <td>N/A</td>
                     </tr>
                     <tr>
-                        <td>Science</td>
-                        <td>10:45 AM - 12:15 PM</td>
-                        <td>Room 102</td>
+                        <td>Project</td>
+                        <td>Pending</td>
+                        <td>N/A</td>
                     </tr>
                     <tr>
-                        <td>History</td>
-                        <td>1:00 PM - 2:30 PM</td>
-                        <td>Room 103</td>
+                        <td>Homework</td>
+                        <td>Submitted</td>
+                        <td>14/25</td>
                     </tr>
                 </tbody>
             </table>

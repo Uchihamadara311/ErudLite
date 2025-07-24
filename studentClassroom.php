@@ -22,32 +22,28 @@
             <i class="fa fa-arrow-left" style="margin-right: 10px"></i>Back to Dashboard
         </a>
         <div style="width: 99%; background-color: rgb(244, 244, 244); padding: 20px; border-radius: 10px; margin-top: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <!-- <table>
+            <table>
                 <thead>
                     <tr>
-                        <th>Course</th>
-                        <th>Time</th>
-                        <th>Room</th>
+                        <th>Student ID</th>
+                        <th>Last Name</th>
+                        <th>First Name</th>
+                        <th>Middle Initial</th>
+                        <th>Birth Date</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Mathematics</td>
-                        <td>9:00 AM - 10:30 AM</td>
-                        <td>Room 101</td>
-                    </tr>
-                    <tr>
-                        <td>Science</td>
-                        <td>10:45 AM - 12:15 PM</td>
-                        <td>Room 102</td>
-                    </tr>
-                    <tr>
-                        <td>History</td>
-                        <td>1:00 PM - 2:30 PM</td>
-                        <td>Room 103</td>
+                        <td>-----</td>
+                        <td>Doe</td>
+                        <td>John</td>
+                        <td>A.</td>
+                        <td>01/01/25</td>
+                        <td>Active</td>
                     </tr>
                 </tbody>
-            </table> -->
+            </table>
     </main>
     <footer id="footer-placeholder"></footer>
     <script src="js/layout-loader.js"></script>
