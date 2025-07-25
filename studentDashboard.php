@@ -14,128 +14,173 @@ if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Student') {
 
 // Get student ID from session
 $student_email = $_SESSION['email'];
-$student_sql = "SELECT s.Student_ID, pb.Given_Name, pb.Last_Name, cl.Grade_Level, cl.School_Year, cr.Section
-                FROM Student s 
-                JOIN Profile p ON s.Profile_ID = p.Profile_ID 
-                JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
-                JOIN Account a ON p.Profile_ID = a.Profile_ID
-                JOIN Role r ON a.Role_ID = r.Role_ID
-                JOIN Enrollment e ON s.Student_ID = e.Student_ID
-                JOIN Class c ON e.Class_ID = c.Class_ID
-                JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
-                JOIN Classroom cr ON c.Room_ID = cr.Room_ID
-                WHERE r.Email = ? AND e.Status = 'Active'
-                ORDER BY cl.School_Year DESC, cl.Grade_Level DESC
-                LIMIT 1";
-$stmt = $conn->prepare($student_sql);
+
+// First, get basic student info (without enrollment requirement)
+$basic_student_sql = "SELECT s.Student_ID, pb.Given_Name, pb.Last_Name
+                      FROM Student s 
+                      JOIN Profile p ON s.Profile_ID = p.Profile_ID 
+                      JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
+                      JOIN Account a ON p.Profile_ID = a.Profile_ID
+                      JOIN Role r ON a.Role_ID = r.Role_ID
+                      WHERE r.Email = ?";
+$stmt = $conn->prepare($basic_student_sql);
 $stmt->bind_param("s", $student_email);
 $stmt->execute();
-$student_result = $stmt->get_result();
-$student_data = $student_result->fetch_assoc();
+$basic_result = $stmt->get_result();
+$basic_student = $basic_result->fetch_assoc();
 
-if (!$student_data) {
+if (!$basic_student) {
     $_SESSION['error_message'] = "Student profile not found.";
     header("Location: index.php");
     exit();
 }
 
-$student_id = $student_data['Student_ID'];
-$student_name = trim($student_data['Given_Name'] . ' ' . $student_data['Last_Name']);
-$grade_level = $student_data['Grade_Level'];
-$school_year = $student_data['School_Year'];
-$section = $student_data['Section'];
+$student_id = $basic_student['Student_ID'];
+$student_name = trim($basic_student['Given_Name'] . ' ' . $basic_student['Last_Name']);
 
-// Get student's current term
-$current_term_sql = "SELECT cl.Term FROM Record r
-                     JOIN Record_Details rd ON r.Record_ID = rd.Record_ID
-                     JOIN Clearance cl ON rd.Clearance_ID = cl.Clearance_ID
-                     WHERE r.Student_ID = ? AND cl.School_Year = ?
-                     ORDER BY rd.Record_Date DESC LIMIT 1";
-$stmt = $conn->prepare($current_term_sql);
-$stmt->bind_param("is", $student_id, $school_year);
+// Check if student has active enrollment
+$enrollment_sql = "SELECT s.Student_ID, pb.Given_Name, pb.Last_Name, cl.Grade_Level, cl.School_Year, cr.Section
+                   FROM Student s 
+                   JOIN Profile p ON s.Profile_ID = p.Profile_ID 
+                   JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
+                   JOIN Account a ON p.Profile_ID = a.Profile_ID
+                   JOIN Role r ON a.Role_ID = r.Role_ID
+                   JOIN Enrollment e ON s.Student_ID = e.Student_ID
+                   JOIN Class c ON e.Class_ID = c.Class_ID
+                   JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                   JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                   WHERE r.Email = ? AND e.Status = 'Active'
+                   ORDER BY cl.School_Year DESC, cl.Grade_Level DESC
+                   LIMIT 1";
+$stmt = $conn->prepare($enrollment_sql);
+$stmt->bind_param("s", $student_email);
 $stmt->execute();
-$current_term_result = $stmt->get_result();
-$current_term_data = $current_term_result->fetch_assoc();
-$current_term = $current_term_data ? $current_term_data['Term'] : '1st Semester';
+$enrollment_result = $stmt->get_result();
+$student_data = $enrollment_result->fetch_assoc();
 
-// Get student's grades and calculate GPA
-$grades_sql = "SELECT DISTINCT sub.Subject_Name, sub.Subject_ID,
-                      AVG(rd.Grade) as Average_Grade,
-                      COUNT(rd.Grade) as Grade_Count
-               FROM Record r
-               JOIN Record_Details rd ON r.Record_ID = rd.Record_ID
-               JOIN Clearance cl ON rd.Clearance_ID = cl.Clearance_ID
-               JOIN Subject sub ON r.Subject_ID = sub.Subject_ID
-               WHERE r.Student_ID = ? AND cl.School_Year = ?
-               GROUP BY sub.Subject_ID, sub.Subject_Name
-               ORDER BY sub.Subject_Name";
-$stmt = $conn->prepare($grades_sql);
-$stmt->bind_param("is", $student_id, $school_year);
-$stmt->execute();
-$grades_result = $stmt->get_result();
+// Check enrollment status
+$is_enrolled = ($student_data !== null);
 
-$total_grades = 0;
-$subject_count = 0;
-$subjects_completed = 0;
-$total_subjects = 0;
-
-while ($subject = $grades_result->fetch_assoc()) {
-    $total_subjects++;
-    if ($subject['Average_Grade']) {
-        $total_grades += $subject['Average_Grade'];
-        $subject_count++;
-        if ($subject['Average_Grade'] >= 75) {
-            $subjects_completed++;
-        }
-    }
+if ($is_enrolled) {
+    $grade_level = $student_data['Grade_Level'];
+    $school_year = $student_data['School_Year'];
+    $section = $student_data['Section'];
+} else {
+    // Default values for non-enrolled students
+    $grade_level = 'Not Assigned';
+    $school_year = 'Not Enrolled';
+    $section = 'Not Assigned';
 }
 
-$overall_gpa = $subject_count > 0 ? round($total_grades / $subject_count, 2) : 0;
+$student_id = $basic_student['Student_ID'];
+$student_name = trim($basic_student['Given_Name'] . ' ' . $basic_student['Last_Name']);
 
-// Get attendance statistics
-$attendance_sql = "SELECT 
-                    COUNT(CASE WHEN a.Status = 'Present' THEN 1 END) as Present_Count,
-                    COUNT(CASE WHEN a.Status = 'Absent' THEN 1 END) as Absent_Count,
-                    COUNT(CASE WHEN a.Status = 'Late' THEN 1 END) as Late_Count,
-                    COUNT(CASE WHEN a.Status = 'Excused' THEN 1 END) as Excused_Count,
-                    COUNT(*) as Total_Days
-                   FROM Attendance a
-                   JOIN Class c ON a.Class_ID = c.Class_ID
-                   JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
-                   WHERE a.Student_ID = ? AND cl.School_Year = ?";
-$stmt = $conn->prepare($attendance_sql);
-$stmt->bind_param("is", $student_id, $school_year);
-$stmt->execute();
-$attendance_result = $stmt->get_result();
-$attendance_data = $attendance_result->fetch_assoc();
-
-$total_attendance_days = $attendance_data['Total_Days'] ?: 1;
-$attendance_percentage = round(($attendance_data['Present_Count'] / $total_attendance_days) * 100, 1);
-
-// Get upcoming schedule (next 3 days)
-$upcoming_schedule_sql = "SELECT DISTINCT sub.Subject_Name, sd.Day, sd.Start_Time, sd.End_Time,
-                                 CONCAT(pb.Given_Name, ' ', pb.Last_Name) as Instructor_Name,
-                                 cr.Room
-                          FROM Schedule s
-                          JOIN schedule_details sd ON s.Schedule_ID = sd.Schedule_ID
-                          JOIN Subject sub ON s.Subject_ID = sub.Subject_ID
-                          JOIN Instructor i ON s.Instructor_ID = i.Instructor_ID
-                          JOIN Profile p ON i.Profile_ID = p.Profile_ID
-                          JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
-                          JOIN Class c ON s.Class_ID = c.Class_ID
-                          JOIN Classroom cr ON c.Room_ID = cr.Room_ID
-                          JOIN Enrollment e ON c.Class_ID = e.Class_ID
-                          WHERE e.Student_ID = ? AND e.Status = 'Active'
-                          ORDER BY FIELD(sd.Day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), sd.Start_Time
-                          LIMIT 5";
-$stmt = $conn->prepare($upcoming_schedule_sql);
-$stmt->bind_param("i", $student_id);
-$stmt->execute();
-$schedule_result = $stmt->get_result();
-
+// Initialize variables with default values
+$overall_gpa = 0;
+$total_subjects = 0;
+$subjects_completed = 0;
+$attendance_data = [
+    'Present_Count' => 0,
+    'Absent_Count' => 0,
+    'Late_Count' => 0,
+    'Excused_Count' => 0,
+    'Total_Days' => 0
+];
+$attendance_percentage = 0;
+$current_term = 'Not Available';
 $upcoming_classes = [];
-while ($class = $schedule_result->fetch_assoc()) {
-    $upcoming_classes[] = $class;
+
+// Only proceed with data queries if student is enrolled
+if ($is_enrolled) {
+    // Get student's current term
+    $current_term_sql = "SELECT cl.Term FROM Record r
+                         JOIN Record_Details rd ON r.Record_ID = rd.Record_ID
+                         JOIN Clearance cl ON rd.Clearance_ID = cl.Clearance_ID
+                         WHERE r.Student_ID = ? AND cl.School_Year = ?
+                         ORDER BY rd.Record_Date DESC LIMIT 1";
+    $stmt = $conn->prepare($current_term_sql);
+    $stmt->bind_param("is", $student_id, $school_year);
+    $stmt->execute();
+    $current_term_result = $stmt->get_result();
+    $current_term_data = $current_term_result->fetch_assoc();
+    $current_term = $current_term_data ? $current_term_data['Term'] : '1st Semester';
+
+    // Get student's grades and calculate GPA
+    $grades_sql = "SELECT DISTINCT sub.Subject_Name, sub.Subject_ID,
+                          AVG(rd.Grade) as Average_Grade,
+                          COUNT(rd.Grade) as Grade_Count
+                   FROM Record r
+                   JOIN Record_Details rd ON r.Record_ID = rd.Record_ID
+                   JOIN Clearance cl ON rd.Clearance_ID = cl.Clearance_ID
+                   JOIN Subject sub ON r.Subject_ID = sub.Subject_ID
+                   WHERE r.Student_ID = ? AND cl.School_Year = ?
+                   GROUP BY sub.Subject_ID, sub.Subject_Name
+                   ORDER BY sub.Subject_Name";
+    $stmt = $conn->prepare($grades_sql);
+    $stmt->bind_param("is", $student_id, $school_year);
+    $stmt->execute();
+    $grades_result = $stmt->get_result();
+
+    $total_grades = 0;
+    $subject_count = 0;
+
+    while ($subject = $grades_result->fetch_assoc()) {
+        $total_subjects++;
+        if ($subject['Average_Grade']) {
+            $total_grades += $subject['Average_Grade'];
+            $subject_count++;
+            if ($subject['Average_Grade'] >= 75) {
+                $subjects_completed++;
+            }
+        }
+    }
+
+    $overall_gpa = $subject_count > 0 ? round($total_grades / $subject_count, 2) : 0;
+
+    // Get attendance statistics
+    $attendance_sql = "SELECT 
+                        COUNT(CASE WHEN a.Status = 'Present' THEN 1 END) as Present_Count,
+                        COUNT(CASE WHEN a.Status = 'Absent' THEN 1 END) as Absent_Count,
+                        COUNT(CASE WHEN a.Status = 'Late' THEN 1 END) as Late_Count,
+                        COUNT(CASE WHEN a.Status = 'Excused' THEN 1 END) as Excused_Count,
+                        COUNT(*) as Total_Days
+                       FROM Attendance a
+                       JOIN Class c ON a.Class_ID = c.Class_ID
+                       JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
+                       WHERE a.Student_ID = ? AND cl.School_Year = ?";
+    $stmt = $conn->prepare($attendance_sql);
+    $stmt->bind_param("is", $student_id, $school_year);
+    $stmt->execute();
+    $attendance_result = $stmt->get_result();
+    $attendance_data = $attendance_result->fetch_assoc();
+
+    $total_attendance_days = $attendance_data['Total_Days'] ?: 1;
+    $attendance_percentage = round(($attendance_data['Present_Count'] / $total_attendance_days) * 100, 1);
+
+    // Get upcoming schedule
+    $upcoming_schedule_sql = "SELECT DISTINCT sub.Subject_Name, sd.Day, sd.Start_Time, sd.End_Time,
+                                     CONCAT(pb.Given_Name, ' ', pb.Last_Name) as Instructor_Name,
+                                     cr.Room
+                              FROM Schedule s
+                              JOIN schedule_details sd ON s.Schedule_ID = sd.Schedule_ID
+                              JOIN Subject sub ON s.Subject_ID = sub.Subject_ID
+                              JOIN Instructor i ON s.Instructor_ID = i.Instructor_ID
+                              JOIN Profile p ON i.Profile_ID = p.Profile_ID
+                              JOIN Profile_Bio pb ON p.Profile_ID = pb.Profile_ID
+                              JOIN Class c ON s.Class_ID = c.Class_ID
+                              JOIN Classroom cr ON c.Room_ID = cr.Room_ID
+                              JOIN Enrollment e ON c.Class_ID = e.Class_ID
+                              WHERE e.Student_ID = ? AND e.Status = 'Active'
+                              ORDER BY FIELD(sd.Day, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'), sd.Start_Time
+                              LIMIT 5";
+    $stmt = $conn->prepare($upcoming_schedule_sql);
+    $stmt->bind_param("i", $student_id);
+    $stmt->execute();
+    $schedule_result = $stmt->get_result();
+
+    while ($class = $schedule_result->fetch_assoc()) {
+        $upcoming_classes[] = $class;
+    }
 }
 
 ?>
@@ -293,6 +338,55 @@ while ($class = $schedule_result->fetch_assoc()) {
             color: #666;
             font-size: 0.9em;
         }
+        
+        .not-enrolled-message {
+            background: linear-gradient(180deg, #ff7575ff 0%, #b63030ff 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(255, 118, 117, 0.3);
+        }
+        
+        .not-enrolled-message h2 {
+            margin: 0 0 15px 0;
+            font-size: 2em;
+        }
+        
+        .not-enrolled-message p {
+            margin: 10px 0;
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .contact-info {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        
+        .contact-info h3 {
+            margin: 0 0 10px 0;
+            color: white;
+        }
+        
+        .contact-info p {
+            margin: 5px 0;
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .disabled-card {
+            opacity: 0.5;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+        
+        .disabled-card:hover {
+            transform: none !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+        }
     </style>
 </head>
 <body>
@@ -306,6 +400,7 @@ while ($class = $schedule_result->fetch_assoc()) {
                 <h1><?php echo htmlspecialchars($student_name); ?></h1>
                 <p>GRADE <?php echo $grade_level; ?> (Class <?php echo htmlspecialchars($section); ?>)</p>
                 
+                <?php if ($is_enrolled): ?>
                 <div class="student-details">
                     <div>
                         <strong>School Year:</strong><br>
@@ -320,9 +415,30 @@ while ($class = $schedule_result->fetch_assoc()) {
                         <?php echo $attendance_percentage; ?>%
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
         <div class="rightContainer">
+            <?php if (!$is_enrolled): ?>
+            <!-- Not Enrolled Message -->
+            <div class="not-enrolled-message">
+                <h2><i class="fas fa-exclamation-triangle"></i> Enrollment Required</h2>
+                <p>You are not currently enrolled in any active classes for this academic year.</p>
+                <p>Please contact the school administration to complete your enrollment process.</p>
+                
+                <div class="contact-info">
+                    <h3><i class="fas fa-phone"></i> Contact Information</h3>
+                    <p><strong>Registrar's Office:</strong> registrar@erudlite.edu</p>
+                    <p><strong>Phone:</strong> (555) 123-4567</p>
+                    <p><strong>Office Hours:</strong> Monday - Friday, 8:00 AM - 5:00 PM</p>
+                </div>
+                
+                <p style="margin-top: 20px; font-size: 0.9em;">
+                    <i class="fas fa-info-circle"></i> 
+                    Once enrolled, you'll have access to your grades, schedule, and other academic features.
+                </p>
+            </div>
+            <?php else: ?>
             <!-- Academic Statistics -->
             <div class="dashboard-stats">
                 <div class="stat-card">
@@ -363,29 +479,29 @@ while ($class = $schedule_result->fetch_assoc()) {
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
-            </div>
+            <?php endif; ?>
 
             <!-- Quick Actions -->
             <div class="quick-actions">
-                <a href="studentReport.php" class="action-card">
+                <a href="<?php echo $is_enrolled ? 'studentReport.php' : '#'; ?>" class="action-card <?php echo !$is_enrolled ? 'disabled-card' : ''; ?>">
                     <i class="fas fa-chart-line"></i>
                     <h3>Academic Report</h3>
-                    <p>View your grades and academic progress</p>
+                    <p><?php echo $is_enrolled ? 'View your grades and academic progress' : 'Available after enrollment'; ?></p>
                 </a>
-                <a href="studentAcademicStats.php" class="action-card">
+                <a href="<?php echo $is_enrolled ? 'studentAcademicStats.php' : '#'; ?>" class="action-card <?php echo !$is_enrolled ? 'disabled-card' : ''; ?>">
                     <i class="fas fa-calendar-check"></i>
                     <h3>Academic Stats</h3>
-                    <p>Track attendance and performance</p>
+                    <p><?php echo $is_enrolled ? 'Track attendance and performance' : 'Available after enrollment'; ?></p>
                 </a>
-                <a href="studentClearance.php" class="action-card">
+                <a href="<?php echo $is_enrolled ? 'studentClearance.php' : '#'; ?>" class="action-card <?php echo !$is_enrolled ? 'disabled-card' : ''; ?>">
                     <i class="fas fa-clipboard-check"></i>
                     <h3>Clearance</h3>
-                    <p>Check your clearance status</p>
+                    <p><?php echo $is_enrolled ? 'Check your clearance status' : 'Available after enrollment'; ?></p>
                 </a>
-                <a href="studentSchedule.php" class="action-card">
+                <a href="<?php echo $is_enrolled ? 'studentSchedule.php' : '#'; ?>" class="action-card <?php echo !$is_enrolled ? 'disabled-card' : ''; ?>">
                     <i class="fas fa-clock"></i>
                     <h3>Schedule</h3>
-                    <p>View your class schedule</p>
+                    <p><?php echo $is_enrolled ? 'View your class schedule' : 'Available after enrollment'; ?></p>
                 </a>
             </div>
         </div>
@@ -397,6 +513,7 @@ while ($class = $schedule_result->fetch_assoc()) {
     <script>
         // Enhanced dashboard interactivity
         document.addEventListener('DOMContentLoaded', function() {
+            <?php if ($is_enrolled): ?>
             // Add smooth scrolling for better UX
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
@@ -408,7 +525,7 @@ while ($class = $schedule_result->fetch_assoc()) {
             });
             
             // Add loading animation for action cards
-            const actionCards = document.querySelectorAll('.action-card');
+            const actionCards = document.querySelectorAll('.action-card:not(.disabled-card)');
             actionCards.forEach((card, index) => {
                 card.style.opacity = '0';
                 card.style.transform = 'translateY(20px)';
@@ -429,12 +546,22 @@ while ($class = $schedule_result->fetch_assoc()) {
                     this.style.transform = 'translateY(0) scale(1)';
                 });
             });
+            
+            // Auto-refresh dashboard every 5 minutes to keep data current
+            setTimeout(function() {
+                location.reload();
+            }, 300000);
+            <?php else: ?>
+            // Handle disabled cards for non-enrolled students
+            const disabledCards = document.querySelectorAll('.disabled-card');
+            disabledCards.forEach(card => {
+                card.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    alert('This feature is available after enrollment. Please contact the registrar\'s office to complete your enrollment.');
+                });
+            });
+            <?php endif; ?>
         });
-        
-        // Auto-refresh dashboard every 5 minutes to keep data current
-        setTimeout(function() {
-            location.reload();
-        }, 300000);
     </script>
 </body>
 </html>
