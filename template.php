@@ -18,7 +18,7 @@ if(!isset($_SESSION['email'])) {
 <body>
     <header>
         <div class="topBar">
-            <a class="logo-text" href="quickAccess.php">
+            <a class="logo-text" href="index.php">
                 <img src="assets/logo.png" alt="PMS Logo" class="logo">
                 <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
                     <h3>ERUDLITE [ADMIN]</h3>
@@ -29,7 +29,7 @@ if(!isset($_SESSION['email'])) {
                 <?php endif; ?>
             </a>
             <div class="navBar">
-                <a href="quickAccess.php">Home</a>
+                <a href="index.php">Home</a>
                 <a href="about.php">About</a>
                 <div class="profile-dropdown">
                     <a href="#" class="profile-trigger">
@@ -37,12 +37,8 @@ if(!isset($_SESSION['email'])) {
                         <i class="fas fa-chevron-down"></i>
                     </a>
                     <div class="dropdown-content">
-                        <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Admin'): ?>
-                            <a href="adminLinks.php"><i class="fas fa-users"></i> Admin Dashboard</a>
-                        <?php elseif(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Instructor'): ?>
-                            <a href="instructorDashboard.php"><i class="fas fa-chalkboard-teacher"></i> Instructor Dashboard</a>
-                        <?php else: ?>
-                            <a href="studentDashboard.php"><i class="fas fa-user-graduate"></i> Student Dashboard</a>
+                        <?php if(isset($_SESSION['permissions']) && $_SESSION['permissions'] === 'Student'): ?>
+                            <a href="studentDashboard.php"><i class="fas fa-users"></i> Student Dashboard</a>
                         <?php endif; ?>
                         <a href="manageAccount.php"><i class="fas fa-user-cog"></i> Manage Account</a>
                         <a href="includes/logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>

@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
+    header("Location: index.php");
     exit();
 }
 ?>
@@ -24,7 +24,7 @@ if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
     <main>
         <div class="admin-links-container">
             <!-- <div class="admin-back-btn-wrap">
-                <a href="quickAccess.php" class="admin-back-btn"><i class="fa fa-arrow-left"></i> Back to Quick Access</a>
+                <a href="index.php" class="admin-back-btn"><i class="fa fa-arrow-left"></i> Back to Quick Access</a>
             </div> -->
             <h1 class="page-title">Admin Management Pages</h1>
             <ul class="card-list">
@@ -35,6 +35,7 @@ if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
                 <li><a href="adminEnrollment.php" class="card card-link"><i class="fa-solid fa-user-graduate"></i><span>Enrollment Management</span></a></li>
                 <li><a href="adminSchedule.php" class="card card-link"><i class="fa-solid fa-calendar-days"></i><span>Schedule Management</span></a></li>
                 <li><a href="adminRecord.php" class="card card-link"><i class="fa-solid fa-file-lines"></i><span>Record Management</span></a></li>
+                <li><a href="adminSubjectClearance.php" class="card card-link"><i class="fa-solid fa-clipboard-check"></i><span>Subject Clearance</span></a></li>
             </ul>
         </div>
     </main>

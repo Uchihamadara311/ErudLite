@@ -4,15 +4,15 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
+// Ensure user is logged in and has admin permissions
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: index.php");
+    exit();
+}
+
 // Function to clean input data
 function cleanInput($data) {
     return trim(htmlspecialchars($data));
-}
-
-// Ensure user is logged in and has admin permissions
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
-    exit();
 }
 
 // Initialize messages
@@ -201,7 +201,7 @@ $schedules_sql = "SELECT sd.Day, sd.Start_Time, sd.End_Time,
                   JOIN Clearance cl ON c.Clearance_ID = cl.Clearance_ID
                   JOIN Classroom cr ON c.Room_ID = cr.Room_ID
                   WHERE cl.School_Year = ?
-                  ORDER BY sd.Day, sd.Start_Time";
+                  ORDER BY ipb.Given_Name, sd.Day, sd.Start_Time";
 $stmt_schedules = $conn->prepare($schedules_sql);
 $stmt_schedules->bind_param("s", $selected_year);
 $stmt_schedules->execute();

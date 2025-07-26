@@ -2,16 +2,16 @@
 require_once 'includes/db.php';
 session_start();
 
+// Ensure user is logged in and has admin permissions
+if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
+    header("Location: index.php");
+    exit();
+}
 // Function to clean input data
 function cleanInput($data) {
     return trim(htmlspecialchars($data));
 }
 
-// Ensure user is logged in and has admin permissions
-if(!isset($_SESSION['email']) || $_SESSION['permissions'] != 'Admin') {
-    header("Location: quickAccess.php");
-    exit();
-}
 
 // Initialize messages
 $success_message = '';
@@ -67,9 +67,10 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmt->execute();
                 $result = $stmt->get_result();
                 if (!$result->fetch_assoc()) {
-                    $insert_sql = "INSERT INTO Clearance (Grade_Level, School_Year, Term) VALUES (?, ?, ?)";
+                    $insert_sql = "INSERT INTO Clearance (Grade_Level, School_Year, Term, Requirements) VALUES (?, ?, ?, ?)";
                     $stmt = $conn->prepare($insert_sql);
-                    $stmt->bind_param("iss", $g, $school_year, $t);
+                    $requirements = file_exists('requirements.txt') ? file_get_contents('requirements.txt') : '';
+                    $stmt->bind_param("isss", $g, $school_year, $t, $requirements);
                     $stmt->execute();
                 }
             }
